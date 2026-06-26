@@ -1,0 +1,58 @@
+# Engagement data is sensitive — never commit real target evidence/findings.
+engagements/*
+!engagements/_template/
+!engagements/.gitkeep
+
+# Secrets / local config
+.env
+.dev.vars
+*.key
+*.pem
+.mcp.json
+.claude/mcp.json
+
+# Tooling scratch
+.playwright-mcp/
+.tmp*/
+scratchpad/
+social-preview.png
+out/
+*.har
+__pycache__/
+*.pyc
+
+# --- Credentials / sessions (belt-and-suspenders) -------------------------------
+# REAL control is OUT-OF-TREE storage ($PENTEST_AUTH_HOME, default
+# ~/.redan/auth/). The repo IS git-initialized, so these rules are ACTIVE
+# (sanity-check once):
+#   git check-ignore engagements/_template/roles.json   (must print the path)
+# and add a pre-commit hook that blocks .auth/ , roles.json , *.cookie , JWT/
+# Authorization/Set-Cookie blobs. Placed AFTER the _template re-include so the
+# negation cannot reopen credential files inside it.
+**/.auth/
+**/roles.json
+*.cookie
+*.session
+*.storageState.json
+!**/roles.example.json
+# explicit re-exclude under the un-ignored _template/ (red-team: negation can win)
+engagements/_template/**/roles.json
+engagements/_template/**/.auth/
+engagements/_template/**/*.cookie
+
+# External pentest tools (downloaded by tools/external/bootstrap.py — not committed)
+tools/external/*
+!tools/external/bootstrap.py
+!tools/external/README.md
+
+# Active working copy + root scratch (the committed reference is engagements/_template/scope.yaml)
+/scope.yaml
+/_*.txt
+/*.png
+
+# local deliberately-vulnerable lab (not committed)
+.lab/
+
+# operator-specific (local-only; not part of the public kit)
+/claude-glm.bat
+/claude-glm.ps1

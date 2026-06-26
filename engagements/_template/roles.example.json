@@ -1,0 +1,51 @@
+{
+  "_README": "COPY this to $PENTEST_AUTH_HOME/<slug>/roles.json (OUT OF THE REPO; default ~/.redan/auth/<slug>/), then fill it in. NEVER keep a real roles.json in the repo tree (gitignore is active (the repo is git-initialized) — out-of-tree storage is the real control). Prefer *_env (secret in an env var) over literal password/token. chmod 600. TEST/sandbox accounts ONLY — attest in authorization.md.",
+  "engagement": "<slug>",
+  "roles": [
+    {
+      "role": "userA",
+      "type": "form",
+      "login_url": "https://app.example.com/login",
+      "username": "test-a@example.com",
+      "password_env": "PT_USERA_PW",
+      "username_field": "email",
+      "password_field": "password",
+      "form_fields": {},
+      "identity_url": "https://app.example.com/api/me",
+      "identity_marker": "test-a@example.com",
+      "login_markers_absent": ["name=\"password\"", "Sign in"],
+      "tenant": "tenant-1",
+      "authz_model": "own-only",
+      "owned_objects": ["https://app.example.com/api/orders/1001"]
+    },
+    {
+      "role": "userB",
+      "type": "form",
+      "login_url": "https://app.example.com/login",
+      "username": "test-b@example.com",
+      "password_env": "PT_USERB_PW",
+      "identity_url": "https://app.example.com/api/me",
+      "identity_marker": "test-b@example.com",
+      "tenant": "tenant-2",
+      "authz_model": "own-only",
+      "owned_objects": ["https://app.example.com/api/orders/2002"]
+    },
+    {
+      "role": "admin",
+      "type": "token",
+      "token_env": "PT_ADMIN_TOKEN",
+      "identity_url": "https://app.example.com/api/me",
+      "identity_marker": "\"role\":\"admin\"",
+      "authz_model": "global"
+    },
+    {
+      "role": "sso-user",
+      "type": "storage_state",
+      "storage_state": "/abs/out-of-tree/sso-user.storageState.json",
+      "identity_url": "https://app.example.com/api/me",
+      "identity_marker": "sso-user@example.com",
+      "authz_model": "org-scoped",
+      "_note": "storage_state captured via a real manual login (Playwright storageState export) — for SPA/SSO/MFA targets."
+    }
+  ]
+}

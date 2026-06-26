@@ -1,0 +1,115 @@
+# Deterministic checks
+
+Repeatable, dependency-free Python modules the agents **call** for the mechanical
+parts of an assessment, instead of improvising with ad-hoc curl. Each emits JSON
+to stdout. This is the "crystallize the repeatable checks into
+deterministic tools" pattern, here to:
+
+- **kill LLM variance** — the same target gives the same result every run;
+- give the **verifier** a machine-readable artifact to trust over recollection;
+- make findings **reproducible** for the client (the JSON is the evidence).
+
+All checks are read-only / non-destructive, use a browser UA, ignore cert
+validity (like `curl -k`), and time out. **They take a target argument and do not
+enforce scope — the calling agent is responsible for scope** (the scope-gate hook
+still applies to the `python` invocation).
+
+| Tool | Checks | Usage |
+|---|---|---|
+| `http_headers.py` | Security headers (HSTS/CSP/XFO/XCTO/Referrer/Permissions), cookie flags, version-disclosure headers | `python http_headers.py <url> [<url> ...]` |
+| `tls_check.py` | Accepted TLS versions (flags TLS 1.0/1.1), cert subject/issuer/expiry/validity | `python tls_check.py <host[:port]>` |
+| `dns_email.py` | A/AAAA/NS/MX, SPF, DMARC policy, common DKIM selectors, **CAA + DNSSEC posture** (via DoH) (flags spoofable email + cert/DNS hardening gaps) | `python dns_email.py <domain>` |
+| `wp_fingerprint.py` | WordPress detection + plugin/theme **versions** (generator-meta-authoritative; modal `?ver=` otherwise) | `python wp_fingerprint.py <url>` or `--file <html> [--name <t>]` |
+| `framework_fingerprint.py` | **Active server-side framework ID** (whatweb-style) — beyond the `Server:` banner. Distinctive headers / X-Powered-By / Set-Cookie NAMES (JSESSIONID / ASP.NET / PHPSESSID / connect.sid / laravel_session / …), framework routes (`/actuator`=Spring, `/struts/webconsole.html`=Struts2, `/__debug__/`=Django, `/console`=Flask) + an error-signature probe. Feeds `nuclei`/`cve_lookup`/`ssti`/`deser` targeting. ACTIVE, read-only. | `framework_fingerprint.py <url> [--no-error-probe]` |
+| `path_probe.py` | Built-in sensitive/well-known path list → HTTP status; flags reachable secrets/VCS/backups | `python path_probe.py <base-url> [--full]` |
+| `port_scan.py` | **Web-surface discovery** — HTTP/HTTPS services across web/app/dev/mgmt ports (+ exposed non-web services, banner grab). Threaded TCP-connect, no nmap. ACTIVE. | `python port_scan.py <host> [--profile web\|web-mgmt\|common]` |
+| `redact.py` | **Credential redactor/scanner** (a key control). Redacts Authorization/Cookie/JWT/api_key/password; preserves Set-Cookie attributes; `scan` exits nonzero on a leak (so the QA gate BLOCKS). | `redact.py scan <path>` / `file <in> [out]` / `-` |
+| `finding_schema.py` | **findings.json validator.** Fails hard on severity-above-CVSS-band inflation, exec-summary count drift, missing required fields, bad disposition/`validation_status` enums, **dangling-evidence-path** (every `.evidence` artifact resolves under `evidence/`). Wired BLOCKING into the QA gate + reporter (like redact.py). | `finding_schema.py <findings.json>` |
+| `auth_login.py` | **Acquire a session** per role (out-of-tree `roles.json`; secrets from env, never argv). TLS-validated form POST, multi-channel CSRF, liveness-confirmed; SPA/SSO/MFA → `needs_browser_login`/`storage_state`. | `auth_login.py --engagement <e> [--role R]` |
+| `auth_request.py` | **Authenticated requester (READ-ONLY default)** + IDOR oracle. Per-request session-liveness; method allowlist; `--idor` runs the canary 4-cell (owner/other/anon/control). | `auth_request.py --engagement <e> --role R <url>` / `--idor --owner A --other B --canary V <url>` |
+
+| `recon_sweep.py` | **Runs the whole deterministic layer CONCURRENTLY** (headers + paths + ports + WP fingerprint, + TLS/DNS + **`host_intel`** (Shodan InternetDB passive) + **`wayback_recon`** (Wayback CDX historical surface) when applicable) → one merged JSON. Wall-clock ≈ slowest single check, not the sum. | `recon_sweep.py <url-or-host>` |
+| `cve_lookup.py` | **Known-CVE lookup** via OSV.dev (free, no key) + JS-library version fingerprint → real CVEs for a component+version (closes the vulnerable-component gap). Emits an explicit **`coverage_gap`** when the source can't cover an ecosystem (e.g. **WordPress — OSV has none**; do NOT read as 'no CVEs', corroborate via WPScan/NVD). Pure Python. A version→CVE is a **lead**. | `cve_lookup.py --url <page>` or `--ecosystem npm --package P --version V` |
+| `nuclei_scan.py` | wraps **nuclei** (thousands of deterministic CVE / exposure / misconfig / default-login templates) → toolkit JSON. Signature-based (doesn't vary by model). Needs `tools/external/` (run `bootstrap.py`). | `nuclei_scan.py <url> [--tags cve,exposure,misconfig] [--severity ...] [--rate N]` |
+| `health_check.py` | **Production-site safety.** Baseline a live target, then check between active batches; **exit 2 = ABORT** if it degrades (5xx/latency/unreachable) or starts WAF-blocking/rate-limiting. Protects prod from the assessment. | `health_check.py baseline <url>` then `check <url> --baseline-file <f>` |
+| `sqlmap_run.py` | wraps **sqlmap** to CONFIRM + characterize SQLi (technique + DBMS) and emit JSON. Does NOT dump data (RoE — extraction is a separate gated action). Needs `tools/external/sqlmap/` (`bootstrap.py --sqlmap`). | `sqlmap_run.py <url> [--data "k=v"] [-p param] [--level N --risk N]` |
+| `cmd_inject.py` | **OS command-injection** tester (Commix-style) — `sleep`-based timing + echo-marker across shell separators (semicolon, AND, OR, backtick, `$()`, newline); a controlled delay = the command ran. ACTIVE, param-driven (web-tester runs it on discovered params, like `sqlmap_run`). | `cmd_inject.py <url> --param <p> [--method GET\|POST] [--data 'k=v']` |
+| `ssti_probe.py` | **Server-Side Template Injection** tester (Tplmap-style) — injects math expressions across 18 engines (Jinja2/Twig/FreeMarker/Velocity/Smarty/Mako/Handlebars/EJS/Pug/…); `7*7→49` evaluating = SSTI, identified by which payload fired. ACTIVE, param-driven. | `ssti_probe.py <url> --param <p> [--method GET\|POST] [--data 'k=v']` |
+| `nosql_probe.py` | **NoSQL-injection** tester (NoSQLMap-style) — JSON-operator injection (`$ne`/`$gt`/`$regex`/`$where`/`$in`) on JSON POST endpoints; boolean (length/status delta vs benign baseline) + `$where` timing (≥2.5s). ACTIVE. | `nosql_probe.py <json-post-url> [--param username]` |
+| `lfi_probe.py` | **Local/Remote File Inclusion** (Liffy/Kadimus style) — traversal ladder (`../../../../etc/passwd`, `win.ini`), `php://filter` base64 **source disclosure** (`wp-config`/app source → decode `<?php`/`DB_PASSWORD`), `data://`/`expect://`/`file://`/nullbyte/encoding variants. Baseline-guarded against WAF/SPA catch-all shells. ACTIVE, param-driven. | `lfi_probe.py <url> --param <p> [--method GET\|POST] [--data 'k=v']` |
+| `fuzzer.py` | **Content-discovery + param fuzzing**, core-scaled. `dir` discovers paths from a wordlist (SPA/soft-404 **calibrated** — no catch-all false positives); `param` flags reflections (XSS lead) + SQL-error signatures (SQLi lead). Discovery/leads only. | `fuzzer.py dir <base> [--wordlist f] [--ext .bak,.zip]` / `fuzzer.py param <url> -p <param>` |
+| `param_probe.py` | **HTTP parameter discovery** (Arjun-style) — sends ~100 common param names, diffs the response (length/status/reflection) vs baseline; flags params the endpoint accepts but that aren't visible in the page. Lead source for injection/access-control testing (run on endpoints the crawler surfaces). | `param_probe.py <url> [--method GET\|POST] [--wordlist f] [--diff-threshold 50]` |
+| `js_secrets.py` | Fetches same-origin **JS bundles** and scans for leaked secrets (AWS/Google/Stripe/GitHub/JWT/private-keys/hardcoded creds), internal endpoints, exposed source-maps. Values masked; leads only. Core-scaled. | `js_secrets.py <url> [--max-files N]` |
+| `crawler.py` | **Same-origin spider** (core-scaled, bounded). Extracts links, **forms** (action+inputs → injection/IDOR targets), params, and JS-referenced endpoints. Optionally authenticated via `--cookie`. Surface map for web-tester/fuzzer/sqlmap. | `crawler.py <seed> [--depth N] [--max-pages N] [--cookie "k=v"]` |
+| `graphql_probe.py` | Detects a **GraphQL** endpoint (common paths), runs introspection, enumerates types/queries/mutations; flags introspection-enabled + sensitive types + exposed mutations (authz leads). | `graphql_probe.py <base-or-graphql-url>` |
+| `xxe_probe.py` | **XXE battery + built-in OOB collaborator** listener. In-band file-read + blind/OOB callback detection. Non-destructive (no entity-expansion DoS). Needs an XML sink to fire. | `xxe_probe.py <xml-endpoint> [--collab-host <ip>]` |
+| `ssrf_probe.py` | **SSRF ladder** — an OOB callback confirms the server-fetch primitive (LEAD), then escalates to internal/metadata reach (AWS `169.254.169.254`, GCP, Azure, loopback). Reuses `oob.py`. HONEST: callback-only = LEAD; metadata CONTENT reflected (signal present in the ladder body, absent from baseline, not a substring of the injected URL) = CONFIRMED. GCP/Azure IMDS + loopback are structurally unconfirmable black-box (noted, not "clean"). | `ssrf_probe.py <url> --param <p> [--method GET\|POST] [--collab-host <ip>]` |
+| `deser_detect.py` | Flags **insecure-deserialization sinks** (Java/PHP/pickle/.NET ViewState/Ruby/node-serialize) in cookies/body/values. Detection-only (exploitation needs gadgets) — honest leads. | `deser_detect.py <url>` / `--value <blob>` |
+| `smuggle_probe.py` | **HTTP request-smuggling** detection (CL.TE/TE.CL **timing**, safe — no smuggled payload). Needs a proxy/back-end chain to be vulnerable; lead-only, exploitation operator-gated. | `smuggle_probe.py <url>` |
+| `multi_target.py` | **Scale tooling.** Fans the deterministic layer (recon_sweep, `--deep` adds nuclei+cve) across MANY targets concurrently → per-target merged JSON + roll-up ranked by finding-count (triage where to send the LLM ensemble). | `multi_target.py <targets-file\|h1,h2> [--deep]` |
+| `waf_detect.py` | **Run FIRST against any edge-protected target.** Fingerprints the protection (WAF/server) and detects a **JS proof-of-work challenge** (Imunify360/Cloudflare-class) that urllib/curl tools can't pass — recommends the testing **channel** (deterministic vs **browser agent required**). Prevents challenge-shell false positives. | `waf_detect.py <url>` |
+| `browser_probe.py` | **Systematic Playwright web testing** — the SPA / JS-challenge-WAF channel `waf_detect` routes to. DOM analysis (scripts/inputs/iframes/sinks/frameworks), form detection, JS-network capture, security-header read, screenshot — in a REAL headless Chromium that solves the JS proof-of-work. Re-test every urllib-blind positive through here. Requires `playwright` + chromium. | `browser_probe.py <url> [--screenshot out.png] [--forms] [--headers] [--network] [--dom]` |
+| `origin_discover.py` | **WAF-bypass recon.** Finds a CDN/WAF-fronted site's real **origin IP** (cert transparency + subdomains + direct-IP probing). An origin that serves the site directly = the WAF is bypassable (a finding). | `origin_discover.py <domain>` |
+| `host_intel.py` | **Passive host-IP enrichment** via Shodan InternetDB (no key). Reads Shodan's *already-collected* scan data (no scan of our own — respects shared-host RoE): CPEs, ports, hostnames, tags, `vulns[]` (LEAD — on a shared IP these may be a co-tenant's; verify on-target). Pairs with origin_discover (find an origin IP → enrich it). Wired into `recon_sweep`. | `host_intel.py <ip-or-host> [...]` |
+| `wayback_recon.py` | **Historical surface** via Wayback CDX (no key). Mines archived URLs — old plugin/theme versions (→ `cve_lookup`), deprecated/removed endpoints, leaked secrets in since-deleted pages. Hits archive.org, NOT the target (passive). Wired into `recon_sweep`. | `wayback_recon.py <host> [--from YYYY --to YYYY --limit N]` |
+| `sri_check.py` | **Third-party-JS supply-chain** — enumerates cross-origin `<script src>`, checks each for SRI `integrity=`, fetches bodies, flags cookie-access/exfil sinks. Finding when a cross-origin script lacks SRI AND the page has no CSP. `--html` parses a captured file (WAF-safe). ACTIVE. | `sri_check.py <url> [--html <file>]` |
+| `header_probe.py` | **Pre-auth request-tampering battery** — host-header reflection, CRLF/response-splitting, `X-HTTP-Method-Override`, off-origin open-redirect. Each probe has a control; positives are LEADS. ACTIVE; urllib is blind through a JS-challenge WAF (re-test positives via the browser). | `header_probe.py <url> [--probes host,crlf,method,redirect] [--redirect-param redirect_to]` |
+| `cors_probe.py` | **CORS misconfiguration** — reflected arbitrary Origin + `Allow-Credentials: true` (the CWE-942 dangerous combo; wildcard ACAO *without* credentials is safe and not flagged). Tests an arbitrary https origin + `null`. (Found a real WP-REST CORS issue on a live site that the browser check missed — browsers forbid setting the `Origin` header.) | `cors_probe.py <url> [<url> ...]` |
+| `csp_probe.py` | **CSP directive analyzer** (Google CSP Evaluator style) — fetches the `Content-Security-Policy` header (or `--policy "<csp>"`), parses directives, flags the actually-bypassable policy: `'unsafe-inline'`/`'unsafe-eval'`, wildcard `*` sources, JSONP/CDN allowlist bypass, nonce/hash + `'unsafe-inline'` conflict, missing `base-uri`/`object-src`. Turns "CSP present" into "XSS viable here" vs "CSP strong". | `csp_probe.py <url>` / `--policy "<csp>"` `[--header "Cookie: ..."]` |
+| `jwt_probe.py` | **JWT attack-surface analyzer** — decodes a captured JWT and flags alg:none susceptibility, RS→HS key-confusion surface, kid-injection markers, weak-HS-secret surface, expiry, and privilege-bearing claims. Analyzer only (forgery/replay is the verifier's job, operator-gated). | `jwt_probe.py --token <jwt>` \| `--header "Authorization: Bearer <jwt>"` \| `--file <req.txt>` |
+| `oauth_probe.py` | **OAuth2/OIDC grant-flow misconfig analyzer** (LEAD-grade) — fetches `.well-known/openid-configuration`, then tests `redirect_uri` host/scheme/parser-discrepancy validation (does a code issue for an attacker origin?), `state` requirement, `PKCE` requirement, fragment/referer code-leak. `jwt_probe` inspects the token; this tests the FLOW (the realistic ATO surface on "Sign in with…" apps). | `oauth_probe.py <base>` `[--client-id <id>] [--redirect-uri <legit>]` |
+| `race_probe.py` | **Race-condition / TOCTOU** — fires K copies of a state-changing request CONCURRENTLY (barrier release) vs a serial-K control, then reads the effected count; concurrent > serial = the race (CWE-362/367). MUTATES state → mutation_testing:approved. | `race_probe.py --url <state-url> --count-url <metric-url> --count-regex '(\d+)'` |
+| `proto_pollute.py` | **Server-side prototype pollution (SSPP)** — sends `__proto__`/`constructor.prototype` carriers with privilege/debug markers, then RE-READS a decision endpoint + diffs vs control (CWE-1321). Pollution surfacing on a LATER request is the real bug. | `proto_pollute.py --json-url <POST> --read-url <decision-GET> [--markers isAdmin,role]` |
+| `cache_probe.py` | **Web-cache deception + poisoning** — path-confusion (`/acct;.css`) deception LEAD + unkeyed-input poisoning (poison-then-clean-fetch two-step, decisive; CWE-444/525). | `cache_probe.py <url> [--deception] [--poison]` |
+| `takeover_probe.py` | **Subdomain takeover** — resolves CNAME + matches a fingerprint DB of deprovisioned-resource signatures (S3/GitHub/Heroku/Azure/Vercel/...); a match = likely claimable (confirm within RoE). | `takeover_probe.py <sub> [...]` \| `--file <subs.txt>` |
+| `js_routes.py` | **Deep JS-endpoint extraction** — fetches the page + JS chunks, extracts the FULL callable set (fetch/axios/XHR literals, SPA route tables, embedded GraphQL ops) incl. unlinked/internal routes (the deep-endpoint class). | `js_routes.py <url> [--max-js N]` |
+| `websocket_probe.py` | **WebSocket / stateful surface** — raw-socket WS handshake (tests Origin/cookie/subprotocol auth) + send/receive (stdlib). 2-session message-level IDOR needs the auth-tester. | `websocket_probe.py <ws-url> [--origin O] [--cookie C] [--message M]` |
+| `oob.py` | **OOB collaborator abstraction** — local HTTP listener (default) or Interactsh client (DNS+HTTP+SMTP callbacks; survives egress filtering). Fixes the blind-class false-clean (xxe/SSRF/smuggling). Used by the blind tools + the `exploiter` agent. | `import from oob import Collab` \| `oob.py --smoke` |
+| `clickjack_probe.py` | **Clickjacking** — frameability check (X-Frame-Options / CSP frame-ancestors) + a PoC-HTML builder (transparent iframe over a lure button). Confirmed a real site's homepage was frameable (operationalizes a missing-XFO finding). | `clickjack_probe.py <url> [--action-label L] [--out poc.html]` |
+| `csrf_probe.py` | **CSRF enforcement tester** — the falsifiable control battery on a state-changing endpoint: WITH-token (control, should succeed) vs STRIP-token (should 403) vs TAMPER vs wrong-Origin. A stripped token still accepted = CSRF confirmed. Closes a doctrine promise (`auth_login` only EXTRACTS tokens; nothing tested enforcement). | `csrf_probe.py <url> --method POST --data 'k=v&csrf=TOK'` `[--cookie ..] [--token-name csrf] [--header H]` |
+| `waf_bypass.py` | **WAF-bypass variant battery** — given a BLOCKED payload, replays normalized-equivalent variants (case-mix, inline-comment, URL/unicode encoding, HPP, whitespace, nullbyte) and reports which REACHED the origin (CWE-693). | `waf_bypass.py --url U --payload P --param q --block-marker Forbidden` |
+| `xss_payloads.py` | **OOB-exfil XSS payload generator** — generates context-specific payloads (HTML/attr/JS/script/polyglot/DOM-hash) that exfiltrate cookie/localStorage/token to an oob.py callback. Inject → render in browser → poll oob = end-to-end XSS proof (CWE-79). | `xss_payloads.py --callback <oob-url> [--exfil cookie\|storage\|token]` |
+| `xss_scan.py` | **XSS scanner** (Dalfox-style) — delivers 15 payloads, checks reflection + landing context (HTML/attr/script/JS) + whether output encoding neutralizes it; emits a PoC URL. Reflection-grade lead; DOM-XSS needs `browser_probe.py`. Complements `xss_payloads.py` (the OOB end-to-end proof). | `xss_scan.py <url> --param <p> [--method GET\|POST] [--data 'k=v']` |
+| `second_order.py` | **Second-order injection canary crawl** — injects a canary into a writeable field, then GETs render-surface URLs (admin/export/inbox/profile-view) + greps; a hit = the stored value renders in a DIFFERENT context (CWE-79/89 second-order). Uses the role's session. | `second_order.py --engagement E --role A --inject-url U --field 'k=v' --render-urls <list\|@file>` |
+| `_stealth.py` | **Shared stealth-request helper** — realistic browser UA pool, jittered inter-request delay, header-order randomization, proxy/egress rotation. **Scaffolded — not yet wired into any tool.** | `from _stealth import ua, jitter, proxy` |
+| `_result_cache.py` | **Shared LRU result-cache** — keyed by (tool, target, args-hash), 1h TTL, thread-safe. **Scaffolded — not yet wired into any tool.** Intended for repeated/verify-rerun probes (RoE/rate-limit friendly); cache under `~/.redan/cache`. | `from _result_cache import cached_run` · CLI `stats`/`clear` |
+| `h2_smuggle.py` | **HTTP/2 request smuggling + h2c upgrade** — h2c-upgrade detection (101 = tunnel past ACLs) + H2.CL timing anomaly (CWE-444). curl-based (needs curl --http2); full frame-level needs the `h2` lib. | `h2_smuggle.py <url> [--probe h2c\|h2cl]` |
+| `graphql_adv.py` | **Advanced GraphQL** — depth/cost-bomb (ONE query, observe — not DoS), query batching (rate-limit/authz bypass), field-suggestion (schema brute with introspection off). Extends graphql_probe. | `graphql_adv.py <gql-url> [--depth 10] [--batch 20] [--suggest]` |
+| `openapi_probe.py` | **OpenAPI/Swagger spec-driven fuzzer** (Schemathesis/RESTler style) — fetches + parses `/openapi.json`/`swagger.json` (auto-tries common paths), then per-operation fuzzes type-confusion / enum-bypass / missing-required / extra-field / oversized, DIFFing each response vs its baseline (baseline-identical 200 suppressed → no always-200 false positives). LEAD-grade diffs. | `openapi_probe.py <spec-or-base>` `[--max-ops 50]` |
+| `flow_probe.py` | **Business-logic / workflow abuse** — takes a recorded step-list (cart→coupon→checkout→payment), replays with skip-step / field-tamper (qty/price/coupon → -1/0/99999) / reorder, DIFFS the outcome. A diff = potential logic flaw (LEAD; agent interprets intent). | `flow_probe.py --steps <steps.json>` |
+
+## Concurrency / cores
+The deterministic tools **scale to available cores** (`_concurrency.py`): `path_probe`,
+`port_scan`, and `recon_sweep` fan their network calls across a
+core-derived thread pool (I/O-bound → ~cores×4, bounded; override with
+`--concurrency N`). `path_probe` dropped from a
+~one-at-a-time `sleep(0.4)` loop to a single parallel batch. **Higher concurrency =
+more simultaneous load on the target** — lower it for production / rate-limited
+hosts, go wide on labs/CDN-fronted hosts. (The LLM agent layer is separately
+bounded by the harness at `min(16, cores−2)` concurrent agents — already core-scaled.)
+
+`_authlib.py` is the shared core (out-of-tree storage, cookie jar, liveness, secret-from-env, redaction). Authenticated testing is **read-only by default**, enforced by `auth_request.py` AND the `mutation-gate.py` PreToolUse hook; credentials live OUT OF TREE under `$PENTEST_AUTH_HOME` (default `~/.redan/auth/<slug>/`), never the repo.
+
+## Output contract
+**Canonical shape:** every tool prints a JSON object with `target` (the host/URL/
+token-id tested) and `ok` (bool — *did the check run*, NOT *is the target vulnerable*),
+plus the check-specific data. The recon / header / auth / finding tools also emit a
+`findings[]` array of `{id, severity, detail}` that agents fold into their
+`candidate_findings` (then the verifier confirms/refutes). The **param-driven probes and analyzers** — anything that
+tests one parameter/class and returns a verdict (injection testers
+`cmd_inject`/`ssti_probe`/`nosql_probe`/`xss_scan`/`lfi_probe`, the
+`ssrf_probe`/`csrf_probe`/`csp_probe`/`oauth_probe`/`openapi_probe`/`framework_fingerprint`
+analyzers, and the WAF-variant / payload generators `waf_bypass`/`xss_payloads`) — instead emit a
+`verdict` + `confirmed[]` / `results[]` **lead blob** the agent interprets — **not** a `findings[]`
+array (don't fold one that isn't there). **A disclosed
+component version is a LEAD** — `wp_fingerprint` reports versions; mapping them to
+CVEs and confirming exploitability is the verifier's job (see `pitfalls.md`
+"version banner ≠ vuln"). When `versions_seen` has more than one value, confirm
+the plugin version via its `readme.txt` Stable tag before trusting it.
+
+## Example
+```bash
+python tools/checks/dns_email.py example.com          # → SPF/DMARC posture
+python tools/checks/wp_fingerprint.py https://example.com   # → components + versions
+python tools/checks/http_headers.py https://example.com/wp-login.php
+```

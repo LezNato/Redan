@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Redan">
+  <title>Redan</title>
+  <!-- a redan: two faces meeting at a salient angle (the point), gorge notched at the base -->
+  <path d="M32 6 L58 58 L32 36 L6 58 Z" fill="#c2243a"/>
+</svg>

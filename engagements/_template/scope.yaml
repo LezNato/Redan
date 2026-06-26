@@ -1,0 +1,66 @@
+# ============================================================================
+# ENGAGEMENT SCOPE  —  per-engagement authorization gate.
+#
+# This is the machine-readable scope the agents + scope-gate hook enforce. It
+# lives with the engagement (engagements/<slug>/scope.yaml) as the durable
+# record. To make this engagement ACTIVE, copy it to the repo-root scope.yaml
+# (the hook + session banner read the ROOT copy):
+#     cp engagements/<slug>/scope.yaml scope.yaml
+# The richer client-intake record (authorization, NDA, contacts, RoE doc) lives
+# in authorization.md next to this file.
+# ============================================================================
+
+engagement:
+  name: "<slug>"                    # matches the engagements/<slug>/ folder
+  client: "<client org / 'self'>"
+  type: "client"                    # client | bug-bounty | ctf | self-owned
+  authorization: "<basis>"          # e.g. 'Signed SOW+RoE 2026-06-20 (see authorization.md)'
+  authorization_ref: "<doc/path/ticket>"   # where the signed authorization lives
+  operator: "<operator email>"
+  test_window: "<start..end, tz>"   # agreed testing window
+  source_ips: "<egress IPs you test from>"  # give to client for allowlisting/attribution
+  start: "<YYYY-MM-DD>"
+  end: ""
+
+# Hosts / domains / CIDRs you ARE authorized to test (subdomains of a bare
+# domain are included unless excluded below).
+in_scope:
+  - "<example.com>"
+
+# NEVER touch these (hard-denied by the hook; precedence over in_scope).
+out_of_scope:
+  - "*.gov"
+  - "*.mil"
+  - "*.bank"
+
+out_of_scope_patterns:
+  - "login.microsoftonline.com"
+  - "accounts.google.com"
+  - "auth0.com"
+  - "okta.com"
+
+rules_of_engagement:
+  - "Non-destructive by default. Proof-of-concept only; never weaponize."
+  - "No denial-of-service, load/stress testing, or resource exhaustion."
+  - "No social engineering, phishing, or physical access (unless explicitly contracted)."
+  - "On any real user data: capture ONE redacted proof, then STOP — do not enumerate/exfiltrate."
+  - "Rate-limit active requests; honor the agreed test window and any throttles."
+  - "Stay within in_scope. When unsure, treat as out of scope."
+
+enforce_allowlist: false            # true = also deny active calls to public hosts not in in_scope
+
+# --- Authenticated testing (only when roles.json is provisioned OUT OF TREE) ----
+# Default posture is READ-ONLY: the mutation-gate hook + auth_request.py deny
+# authenticated POST/PUT/PATCH/DELETE unless this is approved AND the contract
+# authorizes write testing against TEST/sandbox accounts (record in authorization.md).
+mutation_testing: false             # false | approved
+max_login_attempts: 3               # per role — avoid tripping account lockout
+max_auth_requests_per_role: 500     # avoid quota/credit exhaustion on test accounts
+
+# --- Production-site safety (a LIVE target you must not break) -------------------
+# When true: agents baseline target health (health_check.py) and re-check between
+# active batches, ABORTING if the site degrades (5xx/latency/unreachable) or starts
+# WAF-blocking / rate-limiting; deterministic checks run at LOW concurrency.
+production: false                   # true for live production sites
+health_latency_factor: 4           # abort if latency > Nx baseline
+prod_concurrency: 8                 # cap for active tools when production: true (lower = gentler)
