@@ -8,7 +8,7 @@ and `methodology.md` gives the *macro pipeline* (recon → test → verify → r
 ("endpoint returns 200 for another user's id") into either a **confirmed
 finding** or an **honest closure** (refuted / informational / out-of-scope).
 
- It runs *inside*
+It runs *inside*
 methodology phases 3–4: recon surfaces leads; for **each** lead you run this loop.
 It is designed to be **automatable** by the agent ensemble — each step names its
 doctrine rule, its concrete probe, and the agent/Workflow shape that runs it.

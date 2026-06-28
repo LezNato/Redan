@@ -3,8 +3,7 @@
 Concrete, recurring traps where something *looks* like a finding but usually
 isn't. This is the `verifier`'s reference and the `web-tester`/`cloud-iam`
 self-check: before tagging anything `confirmed`, find it here and run the
-"confirm or kill" probe. Each entry follows the format
-(Symptom → why it fools you → the decisive test).
+"confirm or kill" probe. Each entry follows Symptom → why it fools you → the decisive test.
 
 A false positive in a client report costs more than a missed lead — it burns
 credibility and the client's remediation budget. Killing these is the single

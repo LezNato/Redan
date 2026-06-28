@@ -17,7 +17,7 @@ gate is the backstop for exactly those.
 - Every evidence artifact referenced in the report exists under `evidence/`.
 - The appendix evidence index matches the actual files present.
 
-> **Decision authority per item** :
+> **Decision authority per item**:
 > **[MECHANICAL]** = a deterministic tool auto-fails it (no judgment).
 > **[DIRECTIONAL]** = agent judgment, but must log a one-line reason.
 > **[RESERVED]** = operator-only — the agent SURFACES it and never decides.

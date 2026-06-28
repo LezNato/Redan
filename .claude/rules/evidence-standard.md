@@ -1,7 +1,6 @@
 # Evidence standard — what counts as a finding
 
-The core evidence discipline (every finding traces to a reproduction
-), specialized for offensive work:
+The single discipline that makes an AI-driven pentest trustworthy:
 
 > **Every FINDING traces to a reproduction. No reproduction → it is a LEAD, not
 > a finding, and it does not go in the report.**
@@ -65,8 +64,6 @@ Leads live in `engagements/<name>/leads.md` for follow-up.
 
 Severity errs toward optimism — the instinct inflates. Correct downward and make
 every CVSS metric earn its value from *demonstrated* impact on THIS target.
-
-
 
 1. **Decompose before you score.** From the evidence, name each axis explicitly:
    attack vector (N/A/L/P), privileges required (PR — did you need an account?

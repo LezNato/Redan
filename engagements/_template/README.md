@@ -15,7 +15,7 @@ engagements/<slug>/
 ├── report.md          # GENERATED from findings.json — do not hand-edit
 ├── report.html        # GENERATED — dark theme, on-screen
 ├── report-light.html  # GENERATED — light theme, print
-└── report-light.pdf   # exadapted from report-light.html (headless print)
+└── report-light.pdf   # exported from report-light.html (headless print)
 ```
 
 ## Workflow

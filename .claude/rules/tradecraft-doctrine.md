@@ -6,7 +6,6 @@ finding bar (`evidence-standard.md`). These are discipline rules about the
 *investigation process itself* — the things that keep an AI-driven assessment
 from producing confident, plausible, false findings.
 
-
 Load before chasing a lead, before calling a finding confirmed, before writing
 the report.
 
