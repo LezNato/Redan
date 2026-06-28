@@ -40,8 +40,10 @@ battery, each with a built-in control) — both ACTIVE; through a JS-challenge W
 their positives via the browser (urllib is blind). Also `cors_probe.py <url>` (reflected
 arbitrary Origin + Allow-Credentials — note: browsers FORBID setting the Origin header, so
 cross-origin CORS reflection must be tested via curl/urllib, not the browser) and, on any
-captured JWT, `jwt_probe.py --header "Authorization: Bearer <jwt>"` (alg:none / key-confusion
-/ kid-injection / claim surface). See `tools/checks/README.md`.
+captured JWT, `jwt_probe.py --header "Authorization: Bearer <jwt>"` (analyzer: alg:none /
+key-confusion / kid / claim surface), then `--crack` (offline HS weak-secret) and, against a
+token-gated URL, `--attack-url <url> --claim role=admin` (active forge: alg:none /
+claim-escalation / RS→HS key-confusion, each with a wrong-sig control). See `tools/checks/README.md`.
 
 This section names the always-run recon/header tools, not the whole ACTIVE battery — you RUN
 the full ACTIVE set in `tools/checks/README.md` per the `methodology.md` vuln-class dispatch:
@@ -49,9 +51,10 @@ the **param-driven injection probes** `cmd_inject` (OS command injection), `ssti
 `nosql_probe` (NoSQLi), `xss_scan` (XSS reflection/context), `lfi_probe` (file inclusion /
 source disclosure), and `sqlmap_run` (SQLi confirmation) on every param a lead points at; plus
 the rest of the ACTIVE battery — `fuzzer`, `crawler`, `js_secrets`, `js_routes`, `param_probe`, `ssrf_probe`,
-`csp_probe`, `csrf_probe`, `oauth_probe`, `graphql_probe` + `graphql_adv`, `xxe_probe`, `deser_detect`,
+`csp_probe`, `csrf_probe`, `oauth_probe`, `graphql_probe` + `graphql_adv`, `xxe_probe`, `soap_probe` (WSDL exposure + XXE + SQLi via SOAP), `deser_detect`,
 `smuggle_probe`, `h2_smuggle`, `race_probe`, `proto_pollute`, `cache_probe`, `second_order`,
 `takeover_probe`, `clickjack_probe`, `waf_bypass`, `websocket_probe`, `xss_payloads`, `browser_probe`, `flow_probe`,
+`upload_probe` (file-upload abuse), `rate_limit_test` (API4 rate-limit detector — a detector, not a stuffer),
 `openapi_probe`, `framework_fingerprint` — are all web-tester-run. Drive each from a recon lead
 (its dispatch row), never as a blind spray; fold the emitted JSON `findings[]`/lead blobs into
 your candidates for the verifier.

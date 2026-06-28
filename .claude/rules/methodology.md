@@ -37,7 +37,7 @@ until the **verifier** has tried to refute them.
      READ-ONLY by default (mutation-gate hook); proves IDOR via the canary/4-cell
      oracle (`auth_request.py --idor`), never by enumerating real users' data.
 4. **Verification (independent).** Every candidate finding goes to `verifier`,
-   which tries to **disprove** it and to reproduce it independently. Findings
+   which tries to **disprove** it and to reproduce it independently (optionally via `replay.py` — exact-byte replay of a captured raw-HTTP transcript, for browser-channel / complex authed flows that are hard to re-derive; stale-credential-aware). Findings
    that can't be reproduced are downgraded to "lead" and kept out of the report.
 5. **Reporting.** `reporter` turns surviving, reproduced findings into a
    CVSS-scored report — one evidence block per finding. It MUST write the file
@@ -128,16 +128,19 @@ The dispatch is a starting point, not a checklist — follow the redirects.
 | `/openapi.json` / `/swagger.json` exposed | API spec → per-operation fuzz | `openapi_probe.py` — type-confusion / enum-bypass / missing-required / extra-field per operation, baseline-diffed (LEAD) |
 | Multi-step flow (cart/coupon/checkout/payment) | Business-logic / workflow abuse | `flow_probe.py` — skip-step, field-tamper (qty/price/coupon), reorder + diff |
 | Edge openresty/nginx + H2 default | HTTP/2 request smuggling | `h2_smuggle.py` (h2c, H2.CL timing) + `smuggle_probe.py` (H1 CL.TE/TE.CL) |
-| JWT in Authorization header | JWT attacks | `jwt_probe.py` — alg:none, RS→HS key-confusion, kid-injection, weak-secret |
+| JWT in Authorization header | JWT attacks | `jwt_probe.py` — analyzer (alg:none/RS→HS/kid surfaces) + `--crack` (offline HS weak-secret) + `--attack-url` active forge (alg:none accept, claim-escalation, RS→HS key-confusion, cracked-secret forge), each forged variant paired with a wrong-sig control so acceptance is decisive (CWE-347) |
 | Cross-origin fetch + reflected ACAO + credentials | CORS misconfiguration | `cors_probe.py` — reflected arbitrary Origin + Allow-Credentials (CWE-942) |
 | `Host:` header reflected / response splits / `X-HTTP-Method-Override` / header-borne redirect | Host-header injection / CRLF / method-override / open-redirect | `header_probe.py` — host-header reflection, CRLF/response-splitting, method-override, off-origin redirect (each with a control; positives are LEADS) |
 | SPA with deep/minified JS bundles | Hidden/unlinked endpoints | `js_routes.py` — fetch/axios/route-table extraction |
 | Endpoint suspected of hidden params | Parameter discovery | `param_probe.py` — ~100 common params, baseline-diff (length/status/reflection) |
-| Dangling-CNAME subdomain | Subdomain takeover | `takeover_probe.py` — fingerprint DB (S3/GitHub/Heroku/Azure/Vercel) |
+| Dangling-CNAME subdomain | Subdomain takeover | enumerate with `subdomain_enum.py` (passive multi-source + brute), then `takeover_probe.py` — fingerprint DB (S3/GitHub/Heroku/Azure/Vercel) |
 | Third-party scripts loaded cross-origin | Supply-chain / missing SRI | `sri_check.py` — cross-origin script integrity + cookie-access |
 | Blind SSRF/XXE/smuggling (needs callback) | OOB confirmation | `oob.py` collaborator (local + Interactsh) + `xxe_probe.py` |
+| SOAP/WSDL endpoint (`?wsdl`, `application/soap+xml`/`text/xml`) | WSDL exposure / XXE via SOAP / SQLi via params | `soap_probe.py` — discover+parse the WSDL (operation/param contract = an info lead), then per-operation XXE (reflected `file:///` + OOB, CWE-611) + SQLi (error/boolean, CWE-89), each baseline + malformed-control guarded |
 | Ajax/REST action with a signature-gated query param | SQLi behind an integrity gate | reachability first (is the action callable unauth?), then probe params that bypass the signature check (alternate query params, sibling actions, non-query params like pagination/offset); boolean/time/**error-based** SQLi (`extractvalue`/`updatexml` — WAF-clean when `SLEEP` is keyword-blocked) |
 | Integrity-gated query param (HMAC signature) | Signature acquire / mint / juggling | harvest a valid (query,sig) pair from a rendered page; self-mint via an open write endpoint; type-juggle the gate (empty/`0`/`[]=`/`null`); reverse the HMAC offline if a (query,sig) pair is obtained |
+| Multipart upload field (`enctype=multipart/form-data`, `<input type=file>`) | Unrestricted upload / upload-to-RCE / stored-XSS-via-SVG (WSTG-BUSL-09) | `upload_probe.py` — benign-GIF control + bare `.php` allowlist probe, then double-ext / null-byte / alt-ext (`.phtml`/`.phar`/`.php5`) / content-type-mismatch / polyglot-GIF / `.htaccess` / SVG battery; ACCEPTANCE≠EXECUTION (lead until fired on a lab), SVG served as `image/svg+xml` = stored-XSS primitive; ACTIVE → `mutation_testing: approved` |
+| Login / OTP / password-reset / 2FA / state-changing endpoint | Missing rate limit / brute surface (API4:2023) | `rate_limit_test.py` — burst N requests, detect 429 / `Retry-After` / lockout / body-marker / latency-spike; absence on a SENSITIVE endpoint = brute-force / credential-stuffing / OTP-bombing lead (agent judges severity); a DETECTOR not a stuffer (no password lists); an authed per-account throttle is a `coverage_gap`, not "clean" |
 
 **Chain-synthesis:** once the finders + verifier have confirmed primitives, the **`exploiter`** agent
 (post-verifier, pre-reporter, under `mutation_testing: approved`) composes them into end-to-end

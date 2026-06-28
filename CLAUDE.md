@@ -106,7 +106,7 @@ pipeline → hard limits → bar:
 | Integrity/auth tooling | `tools/checks/{redact,finding_schema,auth_login,auth_request,_authlib}.py` — credential redactor/scanner, **findings.json validator** (band/count/field/enum/dangling-evidence), + authenticated-session testing (read-only default, **json/REST login**, canary 4-cell IDOR oracle; **E2E-validated**). Credentials OUT OF TREE under `$PENTEST_AUTH_HOME`, never the repo. |
 | Depth tooling | `tools/checks/cve_lookup.py` (known-CVE via OSV.dev, no key) + `nuclei_scan.py` (wraps **nuclei** — thousands of deterministic templates; binary via `tools/external/bootstrap.py`, gitignored) + `sqlmap_run.py` (wraps **sqlmap** — confirms SQLi + DBMS, no data dump) + `fuzzer.py` (content-discovery SPA-calibrated + param leads, core-scaled). External tools resolve `127.0.0.1` not `localhost` (wrappers normalize). |
 | Production safety | `tools/checks/health_check.py` — baseline a LIVE target, check between active batches, **exit 2 = ABORT** on degrade (5xx/latency/unreachable) or WAF-block/rate-limit. Gated by `scope.yaml: production: true` (+ `prod_concurrency`, `health_latency_factor`); enforced via `rules-of-engagement.md` + `/pentest`. |
-| Coverage-depth + scale | `tools/checks/{crawler,js_secrets,graphql_probe,xxe_probe,deser_detect,smuggle_probe,sri_check,header_probe,multi_target}.py` — same-origin spider (forms/params/JS-endpoints); JS-bundle secret scan; **sri_check** (third-party-JS Subresource-Integrity / supply-chain — missing-SRI + no-CSP + cookie-reading-script exposure); **header_probe** (host-header / CRLF / method-override / open-redirect battery, each with a control); **cors_probe** (reflected-Origin + Allow-Credentials CORS, CWE-942); **jwt_probe** (JWT alg:none / key-confusion / kid-injection analyzer); GraphQL introspection; XXE battery + built-in OOB collaborator; deserialization-sink + request-smuggling detection (lead-only, honest ceilings); and a multi-target deterministic triage sweep for enterprise scope. Mostly core-scaled — the recon/discovery tools fan to ~cores×4 via `_concurrency.py`; the param-driven probes use a fixed default (override with `--concurrency`). Hard-class tools flag leads for the verifier. (header_probe/sri_check are ACTIVE — not in recon_sweep; web-tester runs them. The param-driven probes cmd_inject/ssti_probe/nosql_probe/xss_scan are likewise ACTIVE and web-tester-run; urllib is blind through a JS-challenge WAF — re-test positives via the browser.) |
+| Coverage-depth + scale | `tools/checks/{crawler,js_secrets,graphql_probe,xxe_probe,deser_detect,smuggle_probe,sri_check,header_probe,multi_target}.py` — same-origin spider (forms/params/JS-endpoints); JS-bundle secret scan; **sri_check** (third-party-JS Subresource-Integrity / supply-chain — missing-SRI + no-CSP + cookie-reading-script exposure); **header_probe** (host-header / CRLF / method-override / open-redirect battery, each with a control); **cors_probe** (reflected-Origin + Allow-Credentials CORS, CWE-942); **jwt_probe** (JWT analyzer + offline weak-secret crack + active forge — alg:none / claim-escalation / RS→HS key-confusion, each paired with a wrong-sig control); GraphQL introspection; XXE battery + built-in OOB collaborator; deserialization-sink + request-smuggling detection (lead-only, honest ceilings); and a multi-target deterministic triage sweep for enterprise scope. Mostly core-scaled — the recon/discovery tools fan to ~cores×4 via `_concurrency.py`; the param-driven probes use a fixed default (override with `--concurrency`). Hard-class tools flag leads for the verifier. (header_probe/sri_check are ACTIVE — not in recon_sweep; web-tester runs them. The param-driven probes cmd_inject/ssti_probe/nosql_probe/xss_scan are likewise ACTIVE and web-tester-run; urllib is blind through a JS-challenge WAF — re-test positives via the browser.) |
 | Edge / WAF + bypass recon | `tools/checks/waf_detect.py` — **run FIRST** against an edge-protected target: detects a JS proof-of-work challenge (Imunify360/Cloudflare-class) and routes the testing **channel** (`js-challenge` ⇒ urllib/curl tools are blind → use the **browser agents**, which solve the challenge like a real attacker's headless Chrome). `origin_discover.py` — WAF-bypass recon (find a directly-reachable origin IP = a finding). See `pitfalls.md` "WAF/challenge shell" + `/pentest` recon routing. |
 | Report renderer | `tools/report-render/{render_report.py,export.py,report.css,report-light.css,README.md}` — **findings.json (single source) → report.md + report.html (dark)** via `--all` (dark is the default; light/print theme opt-in via `--theme light`; dark survives PDF via a `@media print` block). **report.html is a STANDALONE deliverable**: CSS inlined **and the referenced evidence embedded inline** (text in collapsible `<details>`, screenshots as base64) so a client with only that file has the full evidence; per-finding bullets link to the appendix block; embedded text is redaction-neutralized on the way in (the render-time chokepoint); oversized artifacts truncated/noted; `--no-embed-evidence` opts out. **Standards-aligned:** per-finding `owasp`/`wstg`/`attack` tags + engagement `asvs_level`/`coverage[]`/`limitations[]`/`compliance` render as report **§4 "Standards coverage & limitations"** (WSTG/ASVS/API coverage matrix). **`export.py` → SARIF 2.1.0 / Jira-CSV / DefectDojo** for vuln-mgmt ingestion (redaction chokepoint). Dark-glass visual treatment, re-keyed to pentest severity. |
 | Per-engagement files | `engagements/<name>/{authorization.md,scope.yaml,evidence/,leads.md,findings.json,report.md,report.html,report-light.html,report-light.pdf}` — `report.*` GENERATED from `findings.json`; never hand-edit them |
@@ -124,23 +124,24 @@ pipeline → hard limits → bar:
 
 ## Current state
 
-A comprehensive web-only black-box pentest ensemble: **62 stdlib modules**, **8 agents**, a
+A comprehensive web-only black-box pentest ensemble: **67 stdlib modules**, **8 agents**, a
 **chain-exploitation layer**, independent verification, and a QA-gated single-source
 reporting pipeline. Proven on real engagements (including a WAF'd WordPress site and a React/ASP.NET SPA) +
 validated on a deliberately-vulnerable lab.
 
-### Tooling (`tools/checks/`, 62 modules, core-scaled, stdlib-only, JSON output)
+### Tooling (`tools/checks/`, 67 modules, core-scaled, stdlib-only, JSON output)
 **Recon**: `http_headers`, `tls_check`, `dns_email` (+CAA/DNSSEC), `wp_fingerprint`, `path_probe`,
-`port_scan`, `recon_sweep` (concurrent), `host_intel` (Shodan passive), `wayback_recon` (CDX),
+`port_scan`, `recon_sweep` (concurrent), `host_intel` (Shodan passive), `wayback_recon` (CDX), `subdomain_enum` (subfinder-style multi-source passive + wordlist brute),
 `waf_detect` (JS-challenge routing), `origin_discover`, `multi_target`, `health_check` (prod safety),
 `framework_fingerprint` (active server-framework ID — whatweb-style, beyond the `Server:` banner).
 **Active testing**: `fuzzer`, `crawler`, `js_secrets`, `js_routes` (deep JS), `sri_check`
 (supply-chain), `header_probe` (host-header/CRLF/method/redirect), `cors_probe` (CWE-942),
-`jwt_probe` (analyzer), `clickjack_probe`, `waf_bypass` (variant battery), `websocket_probe`
+`jwt_probe` (analyzer + offline crack + active forge), `clickjack_probe`, `waf_bypass` (variant battery), `websocket_probe`
 (stateful), `race_probe` (TOCTOU), `proto_pollute` (SSPP), `cache_probe` (deception/poisoning),
 `second_order` (canary crawl), `takeover_probe` (subdomain), `graphql_probe` + `graphql_adv`
-(depth/batch/suggestion), `xxe_probe` (+OOB), `deser_detect`, `smuggle_probe` (H1) + `h2_smuggle`
-(H2/h2c), `flow_probe` (business logic), `cve_lookup` (OSV + coverage_gap), `nuclei_scan` (thousands of
+(depth/batch/suggestion), `xxe_probe` (+OOB), `soap_probe` (WSDL discovery + XXE + SQLi via SOAP), `deser_detect`, `smuggle_probe` (H1) + `h2_smuggle`
+(H2/h2c), `flow_probe` (business logic), `upload_probe` (file upload abuse — control + bypass battery,
+acceptance≠execution), `rate_limit_test` (rate-limit / brute-protection DETECTOR, API4), `cve_lookup` (OSV + coverage_gap), `nuclei_scan` (thousands of
 templates), `sqlmap_run`, `param_probe` (param discovery), `cmd_inject` (command injection),
 `ssti_probe` (template injection), `nosql_probe` (NoSQL injection), `xss_scan` (XSS
 reflection/context) + `xss_payloads` (OOB-exfil proof),
@@ -149,7 +150,7 @@ reflection/context) + `xss_payloads` (OOB-exfil proof),
 `oauth_probe` (OAuth grant-flow misconfig), `openapi_probe` (spec-driven API fuzzing).
 **Authenticated testing** (read-only default, E2E-validated): `auth_login` (form/json/token),
 `auth_request` (IDOR canary 4-cell + funclevel + massassign), `_authlib`, `oob.py` (collaborator).
-**Integrity/reporting**: `redact`, `finding_schema` (dangling-evidence), `render_report`
+**Integrity/reporting**: `redact`, `finding_schema` (dangling-evidence), `replay` (raw-HTTP transcript replay + response-diff — verifier exact-byte reproduction of browser-channel/complex flows; stale-credential-aware), `render_report`
 (standalone HTML + logo), `export` (SARIF/Jira/DefectDojo), `_stealth` (UA pool + jitter + proxy —
 scaffolded, not yet wired into the tools), `_concurrency`, `_result_cache` (LRU result cache —
 scaffolded, not yet wired).

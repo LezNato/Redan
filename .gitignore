@@ -21,6 +21,9 @@ out/
 __pycache__/
 *.pyc
 
+# internal coverage-matrix snapshot (dev planning, not user docs) — deliberately untracked
+/coverage-matrix.md
+
 # --- Credentials / sessions (belt-and-suspenders) -------------------------------
 # REAL control is OUT-OF-TREE storage ($PENTEST_AUTH_HOME, default
 # ~/.redan/auth/). The repo IS git-initialized, so these rules are ACTIVE

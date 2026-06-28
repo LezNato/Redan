@@ -35,7 +35,9 @@ every HTTP/HTTPS service across web/app/dev/mgmt ports, plus exposed non-web
 services). Recon multipliers: `recon_sweep.py <url-or-host>` (the whole recon layer
 concurrently), `host_intel.py <ip>` (Shodan passive enrichment), `wayback_recon.py
 <host>` (Wayback CDX historical surface), `framework_fingerprint.py <url>` (server-
-framework ID beyond the `Server:` banner). Pass the discovered `web_surfaces` to
+framework ID beyond the `Server:` banner), `subdomain_enum.py <domain>` (subfinder-style
+7-source passive subdomain enumeration + optional `--brute` wordlist, wildcard-guarded; feed
+its deduped surface to `takeover_probe` / `origin_discover`). Pass the discovered `web_surfaces` to
 `web-tester` as leads. A
 disclosed version is a **lead**, not a finding. See `tools/checks/README.md`.
 

@@ -49,6 +49,17 @@ Stay in scope; the gate applies to you too.
 When a finding could fail in more than one way, check each way (does-it-reproduce
 / is-it-exploitable / is-it-known) rather than re-running the same check.
 
+## Reproduction aids (exact-byte replay / refutation)
+- For browser-channel or complex authed flows that are hard to re-derive, capture
+  the original request as a raw-HTTP transcript and replay it verbatim with
+  `replay.py --transcript <file> --diff [--reauth-header "Authorization: Bearer X"]
+  [--normalize date,set-cookie,...]`; the observed-vs-captured diff scores reproduction.
+  An authed request that 401s on replay likely means a STALE token (re-run with
+  `--reauth-*`), NOT "not reproduced" — don't refute on a stale credential alone.
+- For JWT candidates, refute/reproduce with `jwt_probe.py --token <jwt> --crack
+  --attack-url <url> --claim role=admin` (offline HS crack + active forge; each forged
+  variant is paired with a wrong-signature control, so acceptance is decisive).
+
 ## Verdict (return for each)
 Use the canonical dispositions from `evidence-standard.md`:
 - `verdict`: confirmed | informational | refuted | lead | duplicate | out-of-scope
