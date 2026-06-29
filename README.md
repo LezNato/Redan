@@ -3,7 +3,7 @@
 <p align="center"><em>A multi-agent web pentest toolkit for Claude Code — every finding is independently verified and QA-gated.</em></p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-v0.2.0-blue.svg" alt="Version: v0.2.0">
+  <img src="https://img.shields.io/badge/version-v0.3.0-blue.svg" alt="Version: v0.3.0">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/core-stdlib--only-success.svg" alt="Core: stdlib-only">
@@ -125,6 +125,7 @@ CLAUDE.md                                         full project instructions
 - **[CLAUDE.md](CLAUDE.md)** — architecture, conventions, current state.
 - **[.claude/rules/](.claude/rules/)** — the doctrine: tradecraft, evidence standard, methodology, pitfalls, QA gate, rules of engagement.
 - **[tools/checks/README.md](tools/checks/README.md)** — the 72-tool catalog.
+- **[CHANGELOG.md](CHANGELOG.md)** — release history (SemVer, git-tagged).
 
 ## Running on other Anthropic-compatible backends
 
