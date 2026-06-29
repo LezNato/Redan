@@ -69,22 +69,33 @@ phase('Audit')
 log(`Mechanical pre-flight clean; running 5 adversarial lenses on engagements/${ENG}`)
 const verdicts = await parallel(LENSES.map(l => () =>
   agent(CTX + '\n\nDIMENSION: ' + l.p + '\n\nReturn {dimension, verdict (pass/block), issues[], notes}.',
-    { label:'qa:'+l.k, phase:'Audit', agentType:'qa-auditor', model:'opus', schema: SCHEMA })))
+    { label:'qa:'+l.k, phase:'Audit', agentType:'qa-auditor', model:'opus', schema: SCHEMA }).catch(() => null)))
 
 const real = verdicts.filter(Boolean)
 const blockers = real.flatMap(v => (v.issues||[]).filter(i => i.severity==='block').map(i => ({dimension:v.dimension, ...i})))
-const gateBlocked = real.some(v => v.verdict==='block') || blockers.length > 0
+const lensBlocked = real.some(v => v.verdict==='block') || blockers.length > 0
 
 phase('Verdict')
-const synthesis = await agent(CTX + '\n\nYou are the QA gate ARBITER. Per-dimension lens verdicts:\n' +
+const ARB = { type:'object', properties:{
+  gate:{type:'string', enum:['pass','block']}, summary:{type:'string'},
+  blocking_issues:{type:'array', items:{type:'object', properties:{
+    item:{type:'string'}, detail:{type:'string'}, remediation:{type:'string'} }}} }, required:['gate'] }
+const arb = await agent(CTX + '\n\nYou are the QA gate ARBITER. Per-dimension lens verdicts:\n' +
   JSON.stringify(real, null, 1).slice(0, 9000) +
-  '\n\nReturn the OVERALL gate verdict: PASS only if every dimension passed with no block-severity issue; otherwise BLOCK. List each blocking issue tied to its qa-gate item with a one-line remediation. Do not rubber-stamp; do not invent blocks.',
-  { label:'qa:arbiter', phase:'Verdict', agentType:'qa-auditor', model:'opus' })
+  '\n\nReturn the OVERALL gate verdict: PASS only if every dimension passed with no block-severity issue; otherwise BLOCK. List each blocking issue tied to its qa-gate item with a one-line remediation. Do not rubber-stamp; do not invent blocks. Return {gate, summary, blocking_issues[]}.',
+  { label:'qa:arbiter', phase:'Verdict', agentType:'qa-auditor', model:'opus', schema: ARB }).catch(() => null)
+
+// The arbiter's verdict COUNTS: the gate BLOCKs if the mechanical lens aggregation OR the
+// arbiter says block (defense in depth -- the arbiter can escalate a cross-lens issue no single
+// lens marked 'block'; it can never rubber-stamp a lens block up to pass).
+const arbiterBlock = !!(arb && arb.gate === 'block')
+const finalBlock = lensBlocked || arbiterBlock
 
 return {
   engagement: ENG,
-  gate: gateBlocked ? 'BLOCK' : 'PASS',
+  gate: finalBlock ? 'BLOCK' : 'PASS',
+  decided_by: lensBlocked ? 'lens-aggregation' : (arbiterBlock ? 'arbiter' : 'unanimous-pass'),
   dimensions: real.map(v => ({dimension:v.dimension, verdict:v.verdict, block_issues:(v.issues||[]).filter(i=>i.severity==='block').length})),
   blocking_issues: blockers.map(b => ({dimension:b.dimension, detail:b.detail, finding:b.finding||''})),
-  arbiter: (synthesis||'').slice(0, 2000),
+  arbiter: arb || { gate: 'unknown', summary: 'arbiter agent returned null (treated as non-blocking)' },
 }

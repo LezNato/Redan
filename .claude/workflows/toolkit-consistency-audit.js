@@ -66,7 +66,7 @@ const results = (await parallel(lenses.map(L => () =>
 phase('Synthesize');
 
 const synth = await agent(
-  'You are the synthesis lead for a toolkit CONSISTENCY audit. The toolkit must be PROJECT-AGNOSTIC. Aggregate findings. Separate real issues (must fix) from cosmetic. Give overall consistency verdict + top 5 fixes.\n\nSCOPE:\n' + SCOPE + '\n\nAUDIT OUTPUTS:\n' + JSON.stringify(results, null, 2),
+  'You are the synthesis lead for a toolkit CONSISTENCY audit. The toolkit must be PROJECT-AGNOSTIC. Aggregate findings. Separate real issues (must fix) from cosmetic. Give overall consistency verdict + top 5 fixes.\n\nSCOPE:\n' + SCOPE + '\n\nAUDIT OUTPUTS:\n' + JSON.stringify(results, null, 2).slice(0, 12000),
   { schema: SYNTH_SCHEMA, label: 'synthesize', phase: 'Synthesize', effort: 'xhigh' }
 );
 
