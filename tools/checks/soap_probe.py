@@ -35,7 +35,7 @@ UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like 
 _CTX = ssl.create_default_context(); _CTX.check_hostname = False; _CTX.verify_mode = ssl.CERT_NONE
 OOB_HITS = []
 SQL_ERR = re.compile(r"\b(sql|syntax|mysql|oracle|odbc|jdbc|postgresql|sqlite|ORA-\d{4,}|microsoft (?:sql|ole db)|(?:mariadb|postgres))\b", re.I)
-PASSWD = re.compile(r"root:x:0:|daemon:|nobody:|/bin/(?:ba)?sh|bin:x:", re.I)
+PASSWD = re.compile(r"root:x:0:|daemon:|nobody:|/bin/(?:ba)?sh|bin:x:", re.I)  # redact-allow: /etc/passwd detector regex, not a secret
 WININI = re.compile(r"\[fonts\]|\[extensions\]|for 16-bit", re.I)
 
 

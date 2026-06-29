@@ -10,7 +10,7 @@ Three layers (you opt into each; the analyzer is always safe/passive):
 
   CRACK   (--crack)  OFFLINE weak-secret crack of an HS256/384/512 token against a
                      wordlist (built-in common secrets + --wordlist file). No target
-                     contact — pure crypto. A cracked secret = full forgery capability.
+                     contact — pure crypto. A cracked secret means full forgery capability.
 
   ATTACK  (--attack-url <url>)  ACTIVE forge-and-send: replay a forged token against a
                      live endpoint and prove ACCEPTANCE. Tests alg:none accept, claim
@@ -325,7 +325,7 @@ if __name__ == "__main__":
         for c in a.claim:
             if "=" in c:
                 k, v = c.split("=", 1); claims.append((k.strip(), v.strip()))
-        cracked_secret = out.get("crack", {}).get("secret") if (out.get("crack") or {}).get("cracked") else None
+        cracked_secret = out.get("crack", {}).get("secret") if (out.get("crack") or {}).get("cracked") else None  # redact-allow: variable, not a literal secret
         extra = {}
         for he in a.header_extra:
             if ":" in he:
