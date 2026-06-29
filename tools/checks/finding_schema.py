@@ -134,6 +134,21 @@ def validate(d, evidence_root=None):
                 errors.append(f"evidence_index[{i}] ref '{rid}' is a DANGLING reference "
                               f"(no such finding/lead/info id) — stale after a move/downgrade (doctrine §9)")
 
+    # --- chain provenance: a chain finding's derived_from primitive ids must resolve
+    #     (the exploiter emits derived_from:[F-..]; an unresolvable id is a dangling chain link) ---
+    for f in findings:
+        df = f.get("derived_from")
+        if df is None:
+            continue
+        if not isinstance(df, list):
+            errors.append(f"{f.get('id')}: derived_from must be a list of finding/lead ids")
+            continue
+        for entry in df:
+            for rid in (ID_RE.findall(str(entry)) or [str(entry)]):
+                if rid not in present:
+                    errors.append(f"{f.get('id')}: derived_from references '{rid}' — not a known "
+                                  f"finding/lead/info id (dangling chain link, doctrine §9)")
+
     # --- dangling evidence-path: every .evidence file-token must resolve under evidence/
     #     (converts the LLM "every referenced artifact exists" QA lens into a deterministic
     #     check; brace-expands {a,b}, recurses subdirs, allowlists URLs; prose is never flagged) ---

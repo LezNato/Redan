@@ -266,6 +266,10 @@ def render_finding_html(f, embed=None):
         meta.append(f'<span><b>{_lbl}:</b> <code>{e(f["cvss_vector"])}</code></span>')
     if f.get("location"):    meta.append(f'<span><b>Location:</b> <code>{e(f["location"])}</code></span>')
     if f.get("validation_status"): meta.append(f'<span><b>Confidence:</b> {e(f["validation_status"])}</span>')
+    if f.get("derived_from"):  # chain finding: cite the primitives it composes
+        _df = f["derived_from"]
+        _df = ", ".join(str(x) for x in _df) if isinstance(_df, list) else str(_df)
+        meta.append(f'<span><b>Chain — derived from:</b> {e(_df)}</span>')
     if f.get("owasp"):       meta.append(f'<span><b>OWASP:</b> {e(f["owasp"])}</span>')
     if f.get("wstg"):        meta.append(f'<span><b>WSTG:</b> {e(f["wstg"])}</span>')
     if f.get("attack") and f["attack"] != "—": meta.append(f'<span><b>ATT&amp;CK:</b> {e(f["attack"])}</span>')
@@ -516,6 +520,10 @@ def render_finding_md(f):
         out.append(f"**Severity:** {sev}  ")
     if f.get("location"):    out.append(f"**Location:** {f['location']}  ")
     if f.get("validation_status"): out.append(f"**Confidence:** {f['validation_status']}  ")
+    if f.get("derived_from"):
+        _df = f["derived_from"]
+        _df = ", ".join(str(x) for x in _df) if isinstance(_df, list) else str(_df)
+        out.append(f"**Chain — derived from:** {_df}  ")
     std = " · ".join(x for x in [
         (f"OWASP {f['owasp']}" if f.get("owasp") else ""),
         (f["wstg"] if f.get("wstg") else ""),
