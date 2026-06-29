@@ -23,6 +23,12 @@ Usage:
 import sys, os, re, json, ssl, argparse, urllib.request, urllib.error
 from urllib.parse import urljoin, urlparse
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    from _result_cache import cached_run  # idempotent OSV lookups -> RoE-friendly cache
+except Exception:  # pragma: no cover - import-path dependent
+    cached_run = None
+
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 OSV = "https://api.osv.dev/v1/query"
 
@@ -36,8 +42,7 @@ WP_GAP_NOTE = ("OSV.dev does NOT index WordPress plugins (HTTP 400 'Invalid ecos
                "Alternatively: WPScan (token) / NVD / vendor advisory manual check.")
 
 
-def osv(ecosystem, name, version, timeout=15):
-    """Returns {vulns:[{id,osv_id,source,summary,cvss}], source, coverage_gap, coverage_gap_reason?}."""
+def _osv_query(ecosystem, name, version, timeout=15):
     body = json.dumps({"package": {"ecosystem": ecosystem, "name": name}, "version": version}).encode()
     req = urllib.request.Request(OSV, data=body, headers={"Content-Type": "application/json"})
     try:
@@ -47,10 +52,11 @@ def osv(ecosystem, name, version, timeout=15):
             msg = e.read().decode("utf-8", "replace")[:200]
         except Exception:
             msg = str(e)
-        return {"vulns": [], "source": "osv", "coverage_gap": True,
+        return {"vulns": [], "source": "osv", "coverage_gap": True, "transient": False,
                 "coverage_gap_reason": f"OSV HTTP {e.code}: {msg} —OSV does not cover this ecosystem; not 'no CVEs'"}
     except Exception as e:
-        return {"vulns": [], "source": "osv", "coverage_gap": True,
+        # transient (network/timeout): must NOT be cached as if it were an answer
+        return {"vulns": [], "source": "osv", "coverage_gap": True, "transient": True,
                 "coverage_gap_reason": f"OSV query failed: {e}"}
     out = []
     for v in data.get("vulns", []):
@@ -58,7 +64,22 @@ def osv(ecosystem, name, version, timeout=15):
         cve = next((a for a in v.get("aliases", []) if a.startswith("CVE-")), v.get("id"))
         out.append({"id": cve, "osv_id": v.get("id"), "source": "osv",
                     "summary": (v.get("summary") or "")[:180], "cvss": cvss})
-    return {"vulns": out, "source": "osv", "coverage_gap": False}
+    return {"vulns": out, "source": "osv", "coverage_gap": False, "transient": False}
+
+
+def osv(ecosystem, name, version, timeout=15):
+    """Returns {vulns:[{id,osv_id,source,summary,cvss}], source, coverage_gap, coverage_gap_reason?}.
+    Idempotent results are TTL-cached (RoE-friendly, speeds verify re-runs); a transient
+    network failure is never cached (it would read as a false 'no CVEs')."""
+    def _do():
+        return _osv_query(ecosystem, name, version, timeout)
+    if cached_run:
+        r, _from_cache = cached_run("cve_lookup.osv", f"{ecosystem}/{name}", _do,
+                                    args_str=version or "", cache_if=lambda x: not x.get("transient"))
+    else:
+        r = _do()
+    r.pop("transient", None)  # internal flag; not part of the public result
+    return r
 
 
 def lookup(ecosystem, name, version, timeout=15):
