@@ -1,15 +1,21 @@
 #!/usr/bin/env python
-"""xss_scan.py — XSS scanner (Dalfox-style): payload delivery + execution verification.
+"""xss_scan.py — reflection-grade XSS scanner (Dalfox-style).
 
-Delivers XSS payloads to a parameter, checks for: (1) reflection in the
-response (necessary), (2) the context it lands in (HTML/attr/script/JS),
-(3) whether output encoding neutralizes it. Generates a PoC URL for confirmed
-findings. For DOM-based XSS, pairs with browser_probe.py (headless execution).
+Per payload, reports: (1) RAW reflection — the payload survived UNENCODED
+(necessary); (2) the landing context; and crucially (3) whether that context is
+EXECUTABLE. A reflection inside a non-executing sink (<textarea>/<title>/<style>/
+<xmp>/<noscript>/HTML comment) or an HTML-ENCODED reflection is NOT executable
+and is reported as informational, never a lead — the reflected!=XSS rule
+(pitfalls.md) made mechanical, replacing the old unconditional executable=True.
 
-Usage: python xss_scan.py <url> [--param name] [--method GET|POST]
-       [--data 'k=v'] [--concurrency 6]
+Emits a LEAD ("verify execution in a real browser"), never "confirmed": urllib
+sees bytes, not DOM execution — browser_probe.py confirms. CWE-79.
+
+Usage: python xss_scan.py <url> --param name [--method GET|POST] [--data 'k=__INJECT__']
 """
-import argparse, json, sys, urllib.request, urllib.parse, urllib.error, ssl, concurrent.futures, re, html
+import argparse, concurrent.futures, html, json, os, re, sys, urllib.parse
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _http import get, post
 
 PAYLOADS = [
     ("classic_alert", "<script>alert(1)</script>"),
@@ -28,71 +34,110 @@ PAYLOADS = [
     ("detail_open", "<details open ontoggle=alert(1)>"),
 ]
 
-def detect_context(body_str, payload):
-    """Determine what context the reflection lands in + if it's executable."""
-    idx = body_str.find(payload)
-    if idx == -1: return {"reflected": False}
-    before = body_str[max(0,idx-20):idx]
-    after = body_str[idx+len(payload):idx+len(payload)+20]
-    in_script = "<script" in body_str[max(0,idx-200):idx].lower()
-    in_attr = re.search(r'=\s*["\']?$', before) is not None
-    in_html = not in_script and not in_attr
-    # check if HTML-special chars survived unencoded
-    unencoded = html.unescape(payload) in html.unescape(body_str)
-    return {"reflected": True, "context": "script" if in_script else ("attr" if in_attr else "html"),
-            "before": before, "after": after, "encoding_bypassed": unencoded}
+RAWTEXT_SINKS = ("textarea", "title", "style", "xmp", "noscript")
 
-def test(url, param, payload, method, data_tmpl, ctx):
-    try:
-        if method == "POST":
-            post = data_tmpl.replace("__INJECT__", urllib.parse.quote(payload))
-            req = urllib.request.Request(url, data=post.encode(), method="POST")
-        else:
-            sep = "&" if "?" in url else "?"
-            req = urllib.request.Request(f"{url}{sep}{param}={urllib.parse.quote(payload)}")
-        req.add_header("User-Agent", "Mozilla/5.0 (compatible; XssScan/1.0)")
-        if method == "POST": req.add_header("Content-Type", "application/x-www-form-urlencoded")
-        with urllib.request.urlopen(req, context=ctx, timeout=15) as r:
-            body = r.read(50000).decode("utf-8", errors="replace")
-            reflected = payload in body
-            encoded_reflected = html.escape(payload) in body  # server encoded it
-            # context detection
-            ctx_info = {"reflected": reflected, "encoded": encoded_reflected and not reflected}
-            if reflected:
-                idx = body.find(payload)
-                before = body[max(0,idx-30):idx]
-                ctx_info["context"] = "script" if "<script" in body[max(0,idx-200):idx].lower() else ("attr" if re.search(r'["\']\s*$', before) else "html")
-                ctx_info["executable"] = True  # reflected unencoded = potentially executable
-            return {"payload": payload[:60], **ctx_info, "status": r.status, "poc_url": f"{url}{'&' if '?' in url else '?'}{param}={urllib.parse.quote(payload)}" if reflected and method=="GET" else None}
-    except urllib.error.HTTPError as e:
-        try: body = e.read(50000).decode("utf-8","replace")
-        except: body = ""
-        reflected = payload in body
-        return {"payload": payload[:60], "reflected": reflected, "status": e.code}
-    except: pass
+
+def nonexec_sink(body_lower, idx):
+    """If the reflection at idx sits inside a non-executing sink, name it (else None)."""
+    pre = body_lower[:idx]
+    if pre.rfind("<!--") > pre.rfind("-->"):
+        return "html-comment"
+    for tag in RAWTEXT_SINKS:
+        if pre.rfind("<" + tag) > pre.rfind("</" + tag):
+            return tag
     return None
+
+
+def is_executable(payload, context):
+    """Executable only if the raw payload carries a markup-breaking char for THIS
+    context. A bare string (e.g. `javascript:alert(1)`) reflected as HTML TEXT is
+    not executable — it needs a URL-attribute sink we cannot prove black-box."""
+    if context in RAWTEXT_SINKS or context == "html-comment":
+        return False
+    if context == "script":
+        return True                                  # already inside a JS context
+    if context == "attr":
+        return ('"' in payload) or ("'" in payload) or ("<" in payload)
+    return "<" in payload                            # html text: need to open a tag
+
+
+def classify(body, payload):
+    """Determine reflection/context/executability for one payload."""
+    raw = payload in body                                   # survived unencoded
+    if not raw:
+        encoded = html.escape(payload) in body
+        return {"reflected": False, "encoded_reflected": encoded,
+                "context": None, "nonexec_sink": None, "executable": False}
+    bl = body.lower(); idx = body.find(payload)
+    sink = nonexec_sink(bl, idx)
+    win = bl[max(0, idx - 200):idx]
+    before = body[max(0, idx - 30):idx]
+    if sink:
+        context = sink
+    elif win.rfind("<script") > win.rfind("</script"):
+        context = "script"
+    elif re.search(r'=\s*["\']?$', before):
+        context = "attr"
+    else:
+        context = "html"
+    return {"reflected": True, "encoded_reflected": False, "context": context,
+            "nonexec_sink": sink, "executable": is_executable(payload, context)}
+
+
+def test(url, param, label, payload, method, data_tmpl):
+    if method == "POST":
+        body = data_tmpl.replace("__INJECT__", urllib.parse.quote(payload))
+        r = post(url, data=body.encode(),
+                 headers={"Content-Type": "application/x-www-form-urlencoded"}, timeout=15)
+    else:
+        sep = "&" if "?" in url else "?"
+        r = get(f"{url}{sep}{param}={urllib.parse.quote(payload)}", timeout=15)
+    if r.error:
+        return {"label": label, "payload": payload[:60], "error": r.error}
+    c = classify(r.text, payload)
+    poc = (f"{url}{'&' if '?' in url else '?'}{param}={urllib.parse.quote(payload)}"
+           if (c["executable"] and method == "GET") else None)
+    return {"label": label, "payload": payload[:60], **c, "status": r.status, "poc_url": poc}
+
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("url"); ap.add_argument("--param", required=True)
-    ap.add_argument("--method", choices=["GET","POST"], default="GET")
+    ap.add_argument("url")
+    ap.add_argument("--param", required=True)
+    ap.add_argument("--method", choices=["GET", "POST"], default="GET")
     ap.add_argument("--data", default="")
     ap.add_argument("--concurrency", type=int, default=6)
     args = ap.parse_args()
-    ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
     data_tmpl = args.data or f"{args.param}=__INJECT__"
+
     results = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.concurrency) as pool:
-        futures = {pool.submit(test, args.url, args.param, p[1], args.method, data_tmpl, ctx): p[0] for p in PAYLOADS}
-        for fut in concurrent.futures.as_completed(futures):
-            r = fut.result()
-            if r and r.get("reflected"): r["label"] = futures[fut]; results.append(r)
-    confirmed = [r for r in results if r.get("executable")]
-    print(json.dumps({"target": args.url, "param": args.param, "ok": True,
-        "payloads_tested": len(PAYLOADS), "reflected": len(results), "confirmed_executable": len(confirmed),
-        "verdict": "XSS CONFIRMED (unencoded reflection in executable context)" if confirmed else ("REFLECTED but likely encoded (informational)" if results else "no reflection"),
-        "confirmed": confirmed, "all_reflected": results,
-        "note": "reflected+executable = potential XSS. Verify in a real browser (browser_probe.py) for DOM execution proof. Encoded-only = refuted."}, indent=2))
+        futs = [pool.submit(test, args.url, args.param, lbl, pl, args.method, data_tmpl)
+                for lbl, pl in PAYLOADS]
+        for f in concurrent.futures.as_completed(futs):
+            results.append(f.result())
+    exec_leads = [r for r in results if r.get("executable")]
+    reflected = [r for r in results if r.get("reflected")]
+    if exec_leads:
+        verdict = ("XSS LEAD — unencoded reflection in an executable context "
+                   "(verify execution in a real browser: browser_probe.py)")
+        disposition = "lead"
+    elif reflected:
+        verdict = "reflected but in a non-executing sink / encoded (informational)"
+        disposition = "informational"
+    else:
+        verdict = "no reflection"
+        disposition = "none"
+    print(json.dumps({
+        "tool": "xss_scan", "target": args.url, "param": args.param, "ok": True, "payloads_tested": len(PAYLOADS),
+        "signals": len(exec_leads), "results": results,
+        "reflected": len(reflected), "executable_candidates": len(exec_leads),
+        "disposition": disposition, "verdict": verdict,
+        "lead_details": exec_leads, "all_reflected": reflected,
+        "note": "reflected+executable = potential XSS LEAD — confirm DOM execution in a real browser "
+                "(browser_probe.py). Non-executing sink / encoded-only = refuted/informational."},
+        indent=2))
+
 
 if __name__ == "__main__":
     main()

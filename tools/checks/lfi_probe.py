@@ -292,8 +292,10 @@ def main():
     if confirmed:
         # A source-disclosure hit (php markers) is stronger than a plain file-read; name it distinctly.
         source_disc = any(r.get("php_markers") for r in confirmed)
-        verdict = ("LFI CONFIRMED — source disclosure (PHP source / secrets via php://filter)"
-                   if source_disc else "LFI CONFIRMED — file read")
+        # doctrine-lint: allow CONFIRMED — content-proof: the disclosed file/source BYTES (php markers /
+        # target-file content) are present in the response, baseline-guarded. Reading the file IS the
+        # demonstrated impact, not a single suggestive signal.
+        verdict = "LFI CONFIRMED — source disclosure (PHP source / secrets via php://filter)" if source_disc else "LFI CONFIRMED — file read"
     elif reflection_leads:
         verdict = "LFI primitive (reflection only) — LEAD"
     else:

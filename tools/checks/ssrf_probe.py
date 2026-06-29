@@ -255,6 +255,9 @@ def main():
             internal_signals.extend(r["signals_matched"])
 
     if confirmed_reach:
+        # doctrine-lint: allow CONFIRMED — content-proof: internal/metadata CONTENT reflected in the
+        # response (signals_matched), absent from baseline AND the injected URL. methodology.md's SSRF
+        # row sanctions "metadata CONTENT reflected = CONFIRMED" (not a single callback signal).
         verdict = "SSRF CONFIRMED — internal/metadata reach"
         note = ("Internal/metadata content reflected in the response (signals: "
                 + ", ".join(sorted(set(internal_signals))) +

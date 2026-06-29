@@ -238,6 +238,9 @@ def probe(args, ctx):
                 "returned the same 200 body -> the edge serves a uniform shell to non-JS clients. "
                 "Re-test through the browser channel before calling this CSRF.")
     elif csrf_signal:
+        # doctrine-lint: allow CONFIRMED — paired-control proof: control WITH token succeeds and the
+        # stripped-token request is STILL accepted (differential), guarded above against the WAF/SPA
+        # uniform-shell false positive. The control makes non-enforcement decisive on this endpoint.
         verdict = "CSRF CONFIRMED — token stripped, action still accepted (token not enforced on this endpoint)"
         note = ("Differential: control WITH token = %s, stripped-token = %s. The server accepted the "
                 "state change without the token. Rate honestly: login/logout CSRF ~Low; a security-"

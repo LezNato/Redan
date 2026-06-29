@@ -1,80 +1,95 @@
 #!/usr/bin/env python
 """ssti_probe.py — Server-Side Template Injection tester (Tplmap-style).
 
-Tests SSTI across major template engines (Jinja2/Twig/FreeMarker/Velocity/
-Smarty/Mako/Handlebars/EJS/Pug/JSP/ASP) by injecting math expressions and
-checking if the evaluated result appears in the response (7*7 → 49).
+Detects SSTI by DIFFERENTIAL evaluation, not a single substring. For each engine
+syntax it sends `7*7` (expects 49) AND a control `8*8` (expects 64), and requires:
+  * 49 appears for the 7*7 payload AND 64 for the 8*8 payload (both products), and
+  * neither 49 nor 64 was already in the benign BASELINE response, and
+  * the literal payload was CONSUMED (not reflected) — a real engine renders
+    `{{7*7}}` away; an app that merely echoes it is not SSTI.
+The old `evaluated AND reflected` gate was backwards (a true engine consumes the
+literal) and `'49' in body` alone is ubiquitous-substring noise — both fixed here.
 
-Usage: python ssti_probe.py <url> [--param name] [--method GET|POST]
-       [--data 'k=v'] [--concurrency 6]
+Emits a LEAD, never "confirmed". CWE-1336. See evidence-standard.md / pitfalls.md.
+
+Usage: python ssti_probe.py <url> --param name [--method GET|POST] [--data 'k=__INJECT__']
 """
-import argparse, json, sys, urllib.request, urllib.parse, urllib.error, ssl, concurrent.futures, re
+import argparse, concurrent.futures, json, os, sys, urllib.parse
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _http import get, post
 
-PAYLOADS = [
-    ("jinja2_expr", "{{7*7}}", "49"),
-    ("jinja2_str", "{{7*'7'}}", "7777777"),
-    ("twig_expr", "{{7*7}}", "49"),
-    ("twig_str", "{{'7'*7}}", "7777777"),
-    ("freemarker", "${7*7}", "49"),
-    ("velocity", "#set($x=7*7)$x", "49"),
-    ("smarty", "{7*7}", "49"),
-    ("mako", "${7*7}", "49"),
-    ("handlebars", "{{multiply 7 7}}", "49"),
-    ("ejs", "<%=7*7%>", "49"),
-    ("pug", "=7*7", "49"),
-    ("jsp_expr", "${7*7}", "49"),
-    ("asp", "<%=7*7%>", "49"),
-    ("erb", "<%=7*7%>", "49"),
-    ("go_text", "{{.}}", ""),
-    ("pebble", "{{7*7}}", "49"),
-    ("thymeleaf", "[[${7*7}]]", "49"),
-    ("stringtemplate", "<7*7>", "49"),
+# label, wrapper with an EXPR placeholder. Arithmetic-capable engines only (the
+# differential needs a computable expression). Engines sharing syntax are grouped.
+ENGINES = [
+    ("jinja2/twig/pebble", "{{EXPR}}"),
+    ("freemarker/mako/jsp", "${EXPR}"),
+    ("smarty",             "{EXPR}"),
+    ("velocity",           "#set($x=EXPR)$x"),
+    ("erb/ejs/asp",        "<%=EXPR%>"),
+    ("pug",                "=EXPR"),
+    ("thymeleaf",          "[[${EXPR}]]"),
+    ("stringtemplate",     "<EXPR>"),
 ]
+CANARY = "redan_ssti_canary"
 
-def test(url, param, payload, expected, method, data_tmpl, ctx):
-    try:
-        if method == "POST":
-            post = data_tmpl.replace("__INJECT__", urllib.parse.quote(payload))
-            req = urllib.request.Request(url, data=post.encode(), method="POST")
-        else:
-            sep = "&" if "?" in url else "?"
-            req = urllib.request.Request(f"{url}{sep}{param}={urllib.parse.quote(payload)}")
-        req.add_header("User-Agent", "Mozilla/5.0 (compatible; SstiProbe/1.0)")
-        if method == "POST": req.add_header("Content-Type", "application/x-www-form-urlencoded")
-        with urllib.request.urlopen(req, context=ctx, timeout=15) as r:
-            body = r.read(50000).decode("utf-8", errors="replace")
-            reflected = payload in body
-            evaluated = expected in body if expected else False
-            return {"engine": payload, "expected": expected, "reflected": reflected, "evaluated": evaluated, "ssti": evaluated and reflected}
-    except urllib.error.HTTPError as e:
-        try: body = e.read(50000).decode("utf-8","replace")
-        except: body = ""
-        reflected = payload in body; evaluated = expected in body if expected else False
-        return {"engine": payload, "reflected": reflected, "evaluated": evaluated, "ssti": evaluated and reflected, "status": e.code}
-    except: pass
-    return None
+
+def fire(url, param, value, method, data_tmpl):
+    if method == "POST":
+        body = data_tmpl.replace("__INJECT__", urllib.parse.quote(value))
+        return post(url, data=body.encode(),
+                    headers={"Content-Type": "application/x-www-form-urlencoded"}, timeout=15)
+    sep = "&" if "?" in url else "?"
+    return get(f"{url}{sep}{param}={urllib.parse.quote(value)}", timeout=15)
+
+
+def probe(url, param, label, wrapper, method, data_tmpl, baseline_text):
+    p7 = wrapper.replace("EXPR", "7*7")
+    p8 = wrapper.replace("EXPR", "8*8")
+    r7 = fire(url, param, p7, method, data_tmpl)
+    r8 = fire(url, param, p8, method, data_tmpl)
+    if r7.error or r8.error:
+        return {"engine": label, "payload": p7, "error": (r7.error or r8.error)}
+    b7, b8 = r7.text, r8.text
+    eval7 = ("49" in b7) and ("49" not in baseline_text)
+    eval8 = ("64" in b8) and ("64" not in baseline_text)
+    reflected = (p7 in b7)  # literal NOT consumed -> not real SSTI
+    ssti = eval7 and eval8 and not reflected
+    return {"engine": label, "payload": p7, "evaluated_7x7": eval7, "evaluated_8x8": eval8,
+            "literal_reflected": reflected, "ssti_lead": ssti, "status": r7.status}
+
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("url"); ap.add_argument("--param", required=True)
-    ap.add_argument("--method", choices=["GET","POST"], default="GET")
+    ap.add_argument("url")
+    ap.add_argument("--param", required=True)
+    ap.add_argument("--method", choices=["GET", "POST"], default="GET")
     ap.add_argument("--data", default="")
     ap.add_argument("--concurrency", type=int, default=6)
     args = ap.parse_args()
-    ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
     data_tmpl = args.data or f"{args.param}=__INJECT__"
+
+    # baseline (benign value) — to exclude pages that already contain 49/64
+    base = fire(args.url, args.param, CANARY, args.method, data_tmpl)
+    baseline_text = "" if base.error else base.text
+
     results = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.concurrency) as pool:
-        futures = {pool.submit(test, args.url, args.param, p[1], p[2], args.method, data_tmpl, ctx): p[0] for p in PAYLOADS}
-        for fut in concurrent.futures.as_completed(futures):
-            r = fut.result()
-            if r: r["engine_label"] = futures[fut]; results.append(r)
-    confirmed = [r for r in results if r.get("ssti")]
-    print(json.dumps({"target": args.url, "param": args.param, "ok": True, "payloads_tested": len(results),
-        "confirmed": len(confirmed),
-        "verdict": "SSTI CONFIRMED — template engine evaluates attacker input" if confirmed else "no SSTI signal",
-        "results": results, "confirmed_details": confirmed,
-        "note": "evaluated=true means the server executed the math (7*7→49) — SSTI. Engine identified by which payload evaluated."}, indent=2))
+        futs = [pool.submit(probe, args.url, args.param, lbl, wr, args.method, data_tmpl, baseline_text)
+                for lbl, wr in ENGINES]
+        for f in concurrent.futures.as_completed(futs):
+            results.append(f.result())
+    leads = [r for r in results if r.get("ssti_lead")]
+    print(json.dumps({
+        "tool": "ssti_probe", "target": args.url, "param": args.param, "ok": True, "payloads_tested": len(results),
+        "signals": len(leads), "disposition": "lead" if leads else "none",
+        "verdict": ("SSTI LEAD — template engine evaluated a differential expression (7*7=49 AND "
+                    "8*8=64, literal consumed); verify exploitation") if leads
+                   else "no SSTI signal",
+        "results": results, "lead_details": leads,
+        "note": "A lead requires BOTH products present (not in baseline) and the literal consumed — "
+                "a real engine renders the expression away. LEAD only; the verifier confirms RCE/"
+                "sandbox-escape exploitability."}, indent=2))
+
 
 if __name__ == "__main__":
     main()
