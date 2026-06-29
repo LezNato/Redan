@@ -46,7 +46,9 @@ impact** — but these limits still bind, always:
 
 ## Conduct
 - Rate-limit active requests; honor program throttles and stated test windows.
-- Keep an audit trail: what was run, against what, when, and the result.
+- Keep an audit trail: what was run, against what, when, and the result. Wrap tool
+  runs with `tools/checks/run_manifest.py wrap --engagement <name> -- <cmd>` to append
+  an append-only `engagements/<name>/run_manifest.jsonl` record automatically.
 - If you are unsure whether an action is in scope or permitted, treat it as
   **not** permitted and ask the operator.
 

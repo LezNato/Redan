@@ -100,8 +100,8 @@ The dispatch is a starting point, not a checklist — follow the redirects.
 | `redirect`/`next`/`return`/`url` param | Open redirect / SSRF | point off-origin, then at an internal host |
 | Server-fetched `url`/`callback`/`webhook`/`img` | SSRF | `ssrf_probe.py` — OOB callback confirms the fetch (LEAD) → internal/metadata-reach ladder; metadata CONTENT reflected (signal absent from baseline + not in the injected URL) = CONFIRMED; GCP/Azure IMDS + loopback are structurally unconfirmable black-box (noted, not "clean") |
 | Error leaks SQL/stack/path | Injection / info disclosure | boolean- then time-based control probe |
-| JSON-bodied login/query (MongoDB/CouchDB/Firebase) | NoSQL injection (CWE-943) | `nosql_probe.py` — `$ne`/`$gt`/`$regex`/`$where` boolean + `$where` timing (≥2.5s) |
-| Shell-spawning param (ping/dns/convert/preview/file op) | OS command injection (CWE-78) | `cmd_inject.py` — `sleep` timing + echo marker across shell separators |
+| JSON-bodied login/query (MongoDB/CouchDB/Firebase) | NoSQL injection (CWE-943) | `nosql_probe.py` — operator-OBJECT injection (`$ne`/`$gt`/`$regex`/`$where`/`$in`); a 4xx→2xx flip or body-delta vs baseline + `$where` timing (≥2.5s) = LEAD |
+| Shell-spawning param (ping/dns/convert/preview/file op) | OS command injection (CWE-78) | `cmd_inject.py` — a COMPUTED echo marker (`cmdi169` from `$((13*13))`, reflection cannot forge it) + a reproduced baseline-relative `sleep` delay = LEAD |
 | Reflected `{{…}}`/`${…}`/`<%=…%>` | SSTI (CWE-1336) | `ssti_probe.py` — differential `7*7=49` AND control `8*8=64` (literal consumed, not in baseline) across 8 engine syntaxes = SSTI LEAD |
 | JWT / session token present | Auth/session flaws | `alg:none`, signature strip, claim tamper |
 | "Sign in with Google/Apple/GitHub" / OAuth `authorize` endpoint | OAuth grant-flow misconfig (ATO) | `oauth_probe.py` — `redirect_uri` parser-discrepancy (code issued for an attacker origin?), `state`, `PKCE` |
@@ -122,7 +122,7 @@ The dispatch is a starting point, not a checklist — follow the redirects.
 | State-changing POST (email/password/permission/transfer) | CSRF (CWE-352) | `csrf_probe.py` — control (with-token) vs strip-token vs tamper vs wrong-Origin; a stripped token still accepted = CSRF |
 | WAF blocks a payload | WAF evasion | `waf_bypass.py` — variant battery (encoding/case/comment/HPP) |
 | Reflected/stored input, needs VICTIM proof | XSS (end-to-end) | `xss_payloads.py` + `oob.py` — OOB-exfil payload; render in browser → callback = confirmed execution |
-| Reflected param, context + encoding check | XSS (reflection-grade, CWE-79) | `xss_scan.py` — reflection + landing context (HTML/attr/script) + encoding-neutralization; DOM-XSS via `browser_probe.py` |
+| Reflected param, context + encoding check | XSS (reflection-grade, CWE-79) | `xss_scan.py` — raw reflection + landing context + **non-executing-sink detection** (`<textarea>`/`<title>`/comment → not executable) + encoding-neutralization = LEAD; DOM-XSS via `browser_probe.py` |
 | CSP header present but bypassable (`unsafe-inline`, `*`, JSONP/CDN allowlist, nonce + `unsafe-inline`) | Weak CSP (XSS viable, CWE-693) | `csp_probe.py` — directive analysis (the difference between "hardening OK" and "XSS exploitable here") |
 | GraphQL endpoint (beyond introspection) | Depth/cost, batching, field-suggestion | `graphql_adv.py` — `--depth` (cost), `--batch` (authz bypass), `--suggest` (schema brute) |
 | `/openapi.json` / `/swagger.json` exposed | API spec → per-operation fuzz | `openapi_probe.py` — type-confusion / enum-bypass / missing-required / extra-field per operation, baseline-diffed (LEAD) |

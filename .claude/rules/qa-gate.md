@@ -66,11 +66,15 @@ gate is the backstop for exactly those.
 
 **6. Redaction — [MECHANICAL]** (deterministic, BLOCKING — do not eyeball) — run
 `python tools/checks/redact.py scan engagements/<name>`. A nonzero exit means
-unredacted credential material (Authorization / Cookie / Set-Cookie / JWT /
-api_key / password) somewhere in the engagement tree — evidence referenced or
-not, `leads.md`, `findings.json`, `report.*` — which is a **BLOCK**. Fix with
+unredacted **credential** material (Authorization / Cookie / Set-Cookie / JWT /
+api_key / `*_password` / AKIA / `ghp_` / URL-creds / PEM) somewhere in the
+engagement tree — evidence referenced or not, `leads.md`, `findings.json`,
+`report.*` — which is a **BLOCK**. PII (email / SSN / Luhn-PAN) is also scanned but
+ADVISORY by default (a report may carry a client contact email); add `--strict` to
+block on PII too. Placeholder values (`<key>`/`${VAR}`/`***`) are ignored. Fix with
 `python tools/checks/redact.py file <path>` (redacts values, preserves Set-Cookie
 attributes), then re-scan until clean. Authenticated engagements MUST pass this.
+(The kit's OWN repo is held to the same bar by `doctrine_lint.py` C7.)
 
 **7. Coverage honesty** — **[RESERVED]** (operator sign-off) — a coverage/standards
 statement is present; any surface that was not tested (couldn't auth, skipped
