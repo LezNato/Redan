@@ -47,7 +47,10 @@ rules_of_engagement:
   - "Rate-limit active requests; honor the agreed test window and any throttles."
   - "Stay within in_scope. When unsure, treat as out of scope."
 
-enforce_allowlist: false            # true = also deny active calls to public hosts not in in_scope
+enforce_allowlist: true             # SAFE DEFAULT: deny active calls to public hosts not in in_scope.
+                                    # Set false only to allow active reach to hosts you deliberately
+                                    # leave off in_scope. (The denylist + fail-closed-no-scope apply
+                                    # regardless; this controls the positive allowlist.)
 
 # --- Authenticated testing (only when roles.json is provisioned OUT OF TREE) ----
 # Default posture is READ-ONLY: the mutation-gate hook + auth_request.py deny

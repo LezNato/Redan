@@ -12,7 +12,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash|PowerShell|WebFetch|.*navigate.*",
+        "matcher": "Bash|PowerShell|WebFetch|.*navigate.*|.*network_request.*|.*browser_evaluate.*|.*browser_run_code.*|.*javascript_tool.*",
         "hooks": [
           {
             "type": "command",

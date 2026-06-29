@@ -7,22 +7,31 @@ reaches out to an out_of_scope target. With enforce_allowlist: true, it also
 denies active calls to public hosts that are not in in_scope.
 
 Contract: stdin = hook JSON {tool_name, tool_input, ...}. Exit 0 = allow.
-Exit 2 + stderr = deny (reason shown to the model). Fail-OPEN on parser
-errors (a broken gate must not brick the session) but log to stderr.
+Exit 2 + stderr = deny (reason shown to the model).
 
-This is a guardrail/reminder layer, not a sandbox. The key control
-is the operator only testing authorized targets. See .claude/rules/.
+Fail posture: the DENYLIST is fail-CLOSED — a gated tool reaching an external
+host with no readable scope.yaml is DENIED (you cannot actively test without a
+recorded authorization). Infra/local hosts stay allowed so a broken/absent scope
+never bricks normal operation. An internal *bug* in the gate still fails open
+(bottom of file) so a gate defect doesn't wedge the session.
+
+This is a guardrail/reminder layer, not a sandbox. The key control is the
+operator only testing authorized targets. See .claude/rules/.
 """
-import sys, json, re, ipaddress, os
+import sys, json, re, ipaddress, os, urllib.parse
 
 # Tools that actually reach a target. Pure search/read tools are NOT gated
-# (so research that merely mentions an excluded host isn't blocked).
+# (so research that merely mentions an excluded host isn't blocked). Beyond the
+# *navigate tools, the request-issuing browser tools (network_request / evaluate
+# / run_code / javascript) are gated too — they can fetch an out-of-scope host.
 GATED_EXACT = {"Bash", "PowerShell", "WebFetch"}
+GATED_SUBSTR = ("navigate", "network_request", "browser_evaluate",
+                "browser_run_code", "javascript_tool")
 def is_gated(tool_name: str) -> bool:
     if tool_name in GATED_EXACT:
         return True
     t = tool_name.lower()
-    return "navigate" in t  # claude-in-chrome + playwright navigate tools
+    return any(s in t for s in GATED_SUBSTR)
 
 # Hosts the agent may always reach: tooling, docs, vuln research, package
 # registries, search. Keeps the gate from blocking normal operation even
@@ -107,7 +116,26 @@ FILE_EXT = {
     "sha256", "pem", "crt", "cer", "der", "p12", "pfx", "key", "lock",
 }
 
+def _canon_host(h):
+    """Canonicalize obfuscated hosts: decimal/hex integer IPs -> dotted-quad so
+    is_private / the denylist see the real address (http://2130706433 = 127.0.0.1)."""
+    h = h.strip().strip(".")
+    try:
+        if re.fullmatch(r"\d{1,10}", h):
+            return str(ipaddress.ip_address(int(h)))
+        if re.fullmatch(r"0x[0-9a-fA-F]+", h):
+            return str(ipaddress.ip_address(int(h, 16)))
+    except (ValueError, ipaddress.AddressValueError):
+        pass
+    return h
+
+
 def extract_hosts(blob: str):
+    # percent-decode first so %65vil.gov / %32%31... obfuscation is seen
+    try:
+        blob = urllib.parse.unquote(blob)
+    except Exception:
+        pass
     hosts = set()
     for m in re.finditer(r"https?://([^/\s\"'`)>\]]+)", blob):
         hosts.add(m.group(1).split("@")[-1].split(":")[0])
@@ -118,7 +146,7 @@ def extract_hosts(blob: str):
         if host.rsplit(".", 1)[-1].lower() in FILE_EXT:   # dotted filename, not a host
             continue
         hosts.add(host)
-    return {h.lower().strip(".") for h in hosts if h}
+    return {_canon_host(h.lower().strip(".")) for h in hosts if h}
 
 def deny(reason):
     sys.stderr.write("[scope-gate] DENIED: " + reason + "\n")
@@ -139,15 +167,17 @@ def main():
         sys.exit(0)
 
     scope = find_scope_file()
+    no_scope = False
+    lines = []
     if not os.path.exists(scope):
-        sys.stderr.write("[scope-gate] no scope.yaml found — define one before active testing.\n")
-        sys.exit(0)
-    try:
-        with open(scope, encoding="utf-8") as f:
-            lines = f.readlines()
-    except Exception as e:
-        sys.stderr.write(f"[scope-gate] could not read scope.yaml ({e}); failing open.\n")
-        sys.exit(0)
+        no_scope = True
+    else:
+        try:
+            with open(scope, encoding="utf-8") as f:
+                lines = f.readlines()
+        except Exception as e:
+            no_scope = True
+            sys.stderr.write(f"[scope-gate] could not read scope.yaml ({e}); failing CLOSED for external hosts.\n")
 
     in_scope = read_list(lines, "in_scope")
     out_scope = read_list(lines, "out_of_scope")
@@ -162,10 +192,14 @@ def main():
         for p in out_patterns:
             if p.lower() in host:
                 deny(f"{host} matches out_of_scope_pattern '{p}'.")
-        # 2) infra / local — never gated
+        # 2) infra / local — never gated (so an absent scope never bricks normal ops)
         if is_private(host) or any(host == a or host.endswith("." + a) for a in INFRA_ALLOW):
             continue
-        # 3) optional strict allowlist
+        # 3) fail CLOSED: no readable scope -> refuse active reach to an EXTERNAL host
+        if no_scope:
+            deny(f"{host}: no readable scope.yaml — refusing active reach to an external host "
+                 f"(fail-closed). Create scope.yaml with this target in_scope before active testing.")
+        # 4) optional strict allowlist
         if enforce and in_scope:
             if not any(host_matches(host, e) for e in in_scope):
                 deny(f"{host} is not in in_scope and enforce_allowlist is on. Add it to scope.yaml to proceed.")
