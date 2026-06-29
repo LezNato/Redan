@@ -40,7 +40,7 @@ findings.
 ## Prerequisites
 
 - **[Claude Code](https://docs.claude.com/en/docs/claude-code/overview)** (the CLI).
-- **Python 3.10+** — the 68 tools are stdlib Python.
+- **Python 3.10+** — the 72 tools are stdlib Python.
 - **Playwright** *(only for the browser-channel agents + `browser_probe.py`; the stdlib tools run without it)*:
   ```sh
   pip install playwright && playwright install chromium
@@ -64,7 +64,8 @@ scope.yaml -> /pentest -> recon · web-tester · auth-tester · cloud-iam
 ```
 
 - **8 agents** (`.claude/agents/`) — finders → `verifier` (refute) → `exploiter` (chains) → `reporter` → `qa-auditor`. Mixed-model: `sonnet` finders, `opus` judgment.
-- **68 stdlib modules** (`tools/checks/`, stdlib-only, JSON) — recon, active testing (injection, XSS, SSRF, access control, request smuggling, file upload, SOAP/XXE, rate limiting, JWT, …), authenticated testing, edge-egress rotation, and reporting. Full catalog: [`tools/checks/README.md`](tools/checks/README.md).
+- **72 stdlib modules** (`tools/checks/`, stdlib-only, JSON) — recon, active testing (injection, XSS, SSRF, access control, request smuggling, file upload, SOAP/XXE, rate limiting, JWT, …), authenticated testing, edge-egress rotation, and reporting. Full catalog: [`tools/checks/README.md`](tools/checks/README.md).
+- **Tested + self-auditing** — a committed [`tests/`](tests/) suite (offline 127.0.0.1 lab, **true-positive AND false-positive-rejection** per covered injection detector + the authed IDOR oracle, plus broad import/compile smoke across all modules) plus a deterministic **doctrine self-audit** (`tools/checks/doctrine_lint.py`) that scans the kit's own adherence to [`.claude/rules/`](.claude/rules/). Both gate CI ([`.github/workflows/tests.yml`](.github/workflows/tests.yml)). Run locally: `python tests/run_all.py`.
 - **Edge-egress rotation** — `proxy_rotate.py` sources free public HTTP proxies to beat per-IP graylists; `browser_probe.py --proxy` routes headless Chromium through them to solve JS proof-of-work challenges (beats BOTH an Imunify360 graylist AND its JS PoW — no Tor required).
 - **Chain exploitation** — the `exploiter` combines confirmed issues into full attack chains (JWT-forge→account takeover, SSRF→internal metadata, IDOR at scale).
 - **Reporting** — `findings.json` → `report.md` + standalone HTML (CSS + evidence inlined — one file, no loose artifacts) + PDF. Per-finding OWASP/WSTG/ATT&CK + CVSS/CWE. Export → SARIF / Jira / DefectDojo.
@@ -109,7 +110,8 @@ A black-box test proves what it *found*, not that *no vulnerability exists*. A r
 
 ```
 .claude/{agents,rules,skills,workflows,hooks}/   the ensemble + doctrine + orchestration
-tools/checks/                                     68 stdlib modules (stdlib-only, JSON)
+tools/checks/                                     72 stdlib modules (stdlib-only, JSON)
+tests/                                            offline TP+FP lab suite + doctrine self-audit (CI-gated)
 tools/report-render/                              findings.json -> report.md/html + SARIF/Jira/DefectDojo
 tools/external/                                   nuclei + sqlmap binaries (gitignored, bootstrapped)
 engagements/_template/                            per-engagement scaffold (copied by /pentest-init)

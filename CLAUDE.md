@@ -100,10 +100,11 @@ pipeline → hard limits → bar:
 | Orchestration skills | `.claude/skills/{pentest-init,pentest,pentest-report,pentest-qa}/SKILL.md` |
 | Reusable workflows | `.claude/workflows/{pentest-assess,qa-gate,plugin_cve_research,toolkit-consistency-audit}.js` — named, parameterized multi-agent workflows run by name: `Workflow({name:'pentest-assess', args:{target,engagement}})` (parallel vuln-class finders → opus verify), `Workflow({name:'qa-gate', args:{engagement}})` (5-lens pre-delivery audit → PASS/BLOCK), and `Workflow({name:'plugin_cve_research', args:{plugins:[{slug,name,version},...]}})` (systematic CVE research across NVD/Wordfence/Patchstack/WPScan for a plugin inventory — fills the OSV WordPress-coverage gap), and `Workflow({name:'toolkit-consistency-audit'})` (repo-wide consistency/drift audit — no engagement hardcoding, stale refs, doc-code drift). The committed, generalizable patterns; target-specific runs stay session-transient. |
 | Engagement template | `engagements/_template/{authorization.md,scope.yaml,leads.md,evidence/,roles.example.json,README.md}` (copied by `/pentest-init`) |
-| Hooks | `.claude/hooks/{scope-gate.py,mutation-gate.py,session-start.sh}` (scope-gate = host allow/deny; mutation-gate = auth testing read-only by default) |
+| Hooks | `.claude/hooks/{scope-gate.py,mutation-gate.py,session-start.sh}` (scope-gate = host allow/deny, **fail-CLOSED on missing scope for external hosts**, gates the request-issuing browser tools; mutation-gate = auth testing read-only by default) |
 | Rules | `.claude/rules/*.md` |
+| Tests / CI | `tests/{lab_server.py,test_*.py,run_all.py,README.md}` — offline 127.0.0.1 lab, **TP + FP-rejection per covered injection detector + the IDOR oracle** (plus import/compile smoke across all modules); `tools/checks/doctrine_lint.py` = deterministic self-audit of kit-vs-rules adherence. `python tests/run_all.py`; CI: `.github/workflows/tests.yml`. |
 | Deterministic checks | `tools/checks/{http_headers,tls_check,dns_email,wp_fingerprint,path_probe,port_scan,host_intel,wayback_recon}.py` + `recon_sweep.py` (runs them all concurrently; **host_intel** = passive Shodan InternetDB host-IP enrichment, **wayback_recon** = Wayback CDX historical surface — both passive recon multipliers wired into the sweep). Repeatable JSON the finder agents call; **core-scaled** (`_concurrency.py` — threads fan to ~cores×4, override `--concurrency`). See `tools/checks/README.md`. |
-| Integrity/auth tooling | `tools/checks/{redact,finding_schema,auth_login,auth_request,_authlib}.py` — credential redactor/scanner, **findings.json validator** (band/count/field/enum/dangling-evidence), + authenticated-session testing (read-only default, **json/REST login**, canary 4-cell IDOR oracle; **E2E-validated**). Credentials OUT OF TREE under `$PENTEST_AUTH_HOME`, never the repo. |
+| Integrity/auth tooling | `tools/checks/{redact,finding_schema,auth_login,auth_request,_authlib,doctrine_lint}.py` — credential **+ PII** redactor/scanner (secret hits BLOCK, PII advisory unless `--strict`; scans all non-binary files; placeholder/allowlist aware), **findings.json validator** (band/count/field/enum/dangling-evidence + `derived_from` chain-provenance), **doctrine self-audit** (kit-vs-`.claude/rules/` adherence, CI-gated), + authenticated-session testing (read-only default, **json/REST login**, canary 4-cell IDOR oracle; **E2E-validated**). Credentials OUT OF TREE under `$PENTEST_AUTH_HOME`, never the repo. |
 | Depth tooling | `tools/checks/cve_lookup.py` (known-CVE via OSV.dev, no key) + `nuclei_scan.py` (wraps **nuclei** — thousands of deterministic templates; binary via `tools/external/bootstrap.py`, gitignored) + `sqlmap_run.py` (wraps **sqlmap** — confirms SQLi + DBMS, no data dump) + `fuzzer.py` (content-discovery SPA-calibrated + param leads, core-scaled). External tools resolve `127.0.0.1` not `localhost` (wrappers normalize). |
 | Production safety | `tools/checks/health_check.py` — baseline a LIVE target, check between active batches, **exit 2 = ABORT** on degrade (5xx/latency/unreachable) or WAF-block/rate-limit. Gated by `scope.yaml: production: true` (+ `prod_concurrency`, `health_latency_factor`); enforced via `rules-of-engagement.md` + `/pentest`. |
 | Coverage-depth + scale | `tools/checks/{crawler,js_secrets,graphql_probe,xxe_probe,deser_detect,smuggle_probe,sri_check,header_probe,cors_probe,jwt_probe,multi_target}.py` — same-origin spider (forms/params/JS-endpoints); JS-bundle secret scan; **sri_check** (third-party-JS Subresource-Integrity / supply-chain — missing-SRI + no-CSP + cookie-reading-script exposure); **header_probe** (host-header / CRLF / method-override / open-redirect battery, each with a control); **cors_probe** (reflected-Origin + Allow-Credentials CORS, CWE-942); **jwt_probe** (JWT analyzer + offline weak-secret crack + active forge — alg:none / claim-escalation / RS→HS key-confusion, each paired with a wrong-sig control); GraphQL introspection; XXE battery + built-in OOB collaborator; deserialization-sink + request-smuggling detection (lead-only, honest ceilings); and a multi-target deterministic triage sweep for enterprise scope. Mostly core-scaled — the recon/discovery tools fan to ~cores×4 via `_concurrency.py`; the param-driven probes use a fixed default (override with `--concurrency`). Hard-class tools flag leads for the verifier. (header_probe/sri_check are ACTIVE — not in recon_sweep; web-tester runs them. The param-driven probes cmd_inject/ssti_probe/nosql_probe/xss_scan are likewise ACTIVE and web-tester-run; urllib is blind through a JS-challenge WAF — re-test positives via the browser.) |
@@ -124,13 +125,17 @@ pipeline → hard limits → bar:
 
 ## Current state
 
-A comprehensive web-only black-box pentest ensemble: **68 stdlib modules**, **8 agents**, a
+A comprehensive web-only black-box pentest ensemble: **72 stdlib modules**, **8 agents**, a
 **chain-exploitation layer**, edge-egress rotation (proxy + browser channel for
 WAF'd/graylisted targets), independent verification, and a QA-gated single-source
 reporting pipeline. Proven on real engagements (including a WAF'd WordPress site and a React/ASP.NET SPA) +
-validated on a deliberately-vulnerable lab.
+validated on a deliberately-vulnerable lab. A committed **`tests/`** suite (offline
+127.0.0.1 lab, TP **+** FP-rejection per covered injection detector + the authed IDOR
+oracle, plus import/compile smoke across all modules) and a deterministic **doctrine
+self-audit** (`tools/checks/doctrine_lint.py`) gate the kit in CI
+(`.github/workflows/tests.yml`) against drift from its own discipline.
 
-### Tooling (`tools/checks/` (68 stdlib modules) + `tools/report-render/`)
+### Tooling (`tools/checks/` (72 stdlib modules) + `tools/report-render/`)
 **Recon**: `http_headers`, `tls_check`, `dns_email` (+CAA/DNSSEC), `wp_fingerprint`, `path_probe`,
 `port_scan`, `recon_sweep` (concurrent), `host_intel` (Shodan passive), `wayback_recon` (CDX), `subdomain_enum` (subfinder-style multi-source passive + wordlist brute), `proxy_rotate` (free-proxy egress rotation when an edge graylists your IP),
 `waf_detect` (JS-challenge routing), `origin_discover`, `multi_target`, `health_check` (prod safety),
@@ -151,10 +156,8 @@ reflection/context) + `xss_payloads` (OOB-exfil proof),
 `oauth_probe` (OAuth grant-flow misconfig), `openapi_probe` (spec-driven API fuzzing).
 **Authenticated testing** (read-only default, E2E-validated): `auth_login` (form/json/token),
 `auth_request` (IDOR canary 4-cell + funclevel + massassign), `_authlib`, `oob.py` (collaborator).
-**Integrity/reporting**: `redact`, `finding_schema` (dangling-evidence), `replay` (raw-HTTP transcript replay + response-diff — verifier exact-byte reproduction of browser-channel/complex flows; stale-credential-aware), `render_report`
-(standalone HTML + logo), `export` (SARIF/Jira/DefectDojo), `_stealth` (UA pool + jitter + proxy —
-scaffolded, not yet wired into the tools), `_concurrency`, `_result_cache` (LRU result cache —
-scaffolded, not yet wired).
+**Integrity/reporting**: `redact` (credential **+ PII** redactor; secret hits BLOCK, PII advisory unless `--strict`; scans every non-binary file incl. `.env`/`.pem`), `finding_schema` (dangling-evidence + `derived_from` chain-provenance), `replay` (raw-HTTP transcript replay + response-diff — verifier exact-byte reproduction of browser-channel/complex flows; stale-credential-aware), `render_report`
+(standalone HTML + logo; renders chain `derived_from`), `export` (SARIF/Jira/DefectDojo — canonical `description`/`reproduction`, redaction via `redact`), `doctrine_lint` (deterministic self-audit of the kit's adherence to `.claude/rules/` — C1–C9), `run_manifest` (append-only per-engagement audit trail — wrap/record/show), `_http` (shared HTTP client — single UA/TLS/proxy chokepoint), `_result` (canonical tool-output contract + validator), `_concurrency`, `_stealth` (UA pool + jitter + proxy — wired via `_http`), `_result_cache` (TTL result cache — wired into `cve_lookup` for idempotent OSV lookups).
 
 ### Agents (8)
 `recon` / `web-tester` / `auth-tester` / `cloud-iam` (finders) → **`verifier`** (refute-bias,

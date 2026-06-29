@@ -102,7 +102,7 @@ The dispatch is a starting point, not a checklist — follow the redirects.
 | Error leaks SQL/stack/path | Injection / info disclosure | boolean- then time-based control probe |
 | JSON-bodied login/query (MongoDB/CouchDB/Firebase) | NoSQL injection (CWE-943) | `nosql_probe.py` — `$ne`/`$gt`/`$regex`/`$where` boolean + `$where` timing (≥2.5s) |
 | Shell-spawning param (ping/dns/convert/preview/file op) | OS command injection (CWE-78) | `cmd_inject.py` — `sleep` timing + echo marker across shell separators |
-| Reflected `{{…}}`/`${…}`/`<%=…%>` | SSTI (CWE-1336) | `ssti_probe.py` — `7*7→49` evaluation across 18 engines |
+| Reflected `{{…}}`/`${…}`/`<%=…%>` | SSTI (CWE-1336) | `ssti_probe.py` — differential `7*7=49` AND control `8*8=64` (literal consumed, not in baseline) across 8 engine syntaxes = SSTI LEAD |
 | JWT / session token present | Auth/session flaws | `alg:none`, signature strip, claim tamper |
 | "Sign in with Google/Apple/GitHub" / OAuth `authorize` endpoint | OAuth grant-flow misconfig (ATO) | `oauth_probe.py` — `redirect_uri` parser-discrepancy (code issued for an attacker origin?), `state`, `PKCE` |
 | Role/`isAdmin`/permission field in a request body | Priv-esc / mass assignment | add/elevate the field and replay |
