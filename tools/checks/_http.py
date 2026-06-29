@@ -57,8 +57,20 @@ def context(verify=False):
     return ctx
 
 
+class _Headers(dict):
+    """Response headers: keys stored lower-cased, but get/[]/in are case-INSENSITIVE
+    (so both `h.get("Content-Type")` and `h.get("content-type")` work). Lets a tool
+    migrate to _http without rewriting its header lookups."""
+    def get(self, k, default=None):
+        return super().get(str(k).lower(), default)
+    def __getitem__(self, k):
+        return super().__getitem__(str(k).lower())
+    def __contains__(self, k):
+        return super().__contains__(str(k).lower())
+
+
 def _headers_lower(hdrs):
-    return {str(k).lower(): v for k, v in hdrs.items()}
+    return _Headers((str(k).lower(), v) for k, v in hdrs.items())
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
