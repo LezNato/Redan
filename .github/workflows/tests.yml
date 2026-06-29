@@ -1,0 +1,21 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # The toolkit is stdlib-only and the suite is offline (local 127.0.0.1 lab),
+      # so there is nothing to install. run_all.py runs the doctrine self-audit
+      # (tools/checks/doctrine_lint.py) + every tests/test_*.py.
+      - name: Doctrine self-audit + test suite
+        run: python tests/run_all.py

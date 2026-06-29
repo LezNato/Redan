@@ -1,0 +1,57 @@
+#!/usr/bin/env python
+"""test_doctrine_lint.py — the self-audit linter must (a) PASS on the current tree
+(regression guard) and (b) actually CATCH a hard-CONFIRMED verdict, while honoring
+the inline allow directive."""
+import os
+import subprocess
+import sys
+import tempfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.dirname(HERE)
+LINT = os.path.join(REPO, "tools", "checks", "doctrine_lint.py")
+sys.path.insert(0, os.path.join(REPO, "tools", "checks"))
+import doctrine_lint  # noqa: E402
+
+CHECKS = []
+
+
+def rec(name, ok, detail=""):
+    CHECKS.append(ok)
+    print(f"[{'PASS' if ok else 'FAIL'}] {name}" + (f" — {detail}" if detail else ""))
+
+
+def write(tmp, body):
+    p = os.path.join(tmp, "probe_x.py")
+    with open(p, "w", encoding="utf-8") as f:
+        f.write(body)
+    return p
+
+
+def main():
+    # (a) the whole linter passes on the real tree
+    r = subprocess.run([sys.executable, LINT], capture_output=True, text=True, timeout=60)
+    rec("linter PASSES on current tree", r.returncode == 0, r.stdout[-300:])
+
+    # (b) it CATCHES a single-signal hard verdict
+    tmp = tempfile.mkdtemp()
+    bad = write(tmp, 'def f():\n    verdict = "SQLI CONFIRMED — single signal"\n    return verdict\n')
+    rec("catches a hard CONFIRMED verdict", len(doctrine_lint.c1_no_hard_confirmed([bad])) == 1)
+
+    # (c) it honors the inline allow directive
+    ok = write(tmp, 'def f():\n    # doctrine-lint: allow CONFIRMED — paired control proves it\n'
+                    '    verdict = "SQLI CONFIRMED — with control"\n    return verdict\n')
+    rec("honors the allow directive", len(doctrine_lint.c1_no_hard_confirmed([ok])) == 0)
+
+    # (d) it does NOT flag a cautionary note mid-sentence, or a LEAD verdict
+    clean = write(tmp, 'def f():\n    note = "this is not a basis for CONFIRMED reach"\n'
+                       '    verdict = "SQLI LEAD — boolean signal"\n    return verdict, note\n')
+    rec("ignores mid-sentence note + LEAD verdict", len(doctrine_lint.c1_no_hard_confirmed([clean])) == 0)
+
+    npass = sum(CHECKS)
+    print(f"\n{npass}/{len(CHECKS)} checks passed")
+    sys.exit(0 if npass == len(CHECKS) else 1)
+
+
+if __name__ == "__main__":
+    main()
