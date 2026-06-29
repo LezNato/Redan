@@ -20,7 +20,7 @@ Redan runs a black-box web/API assessment as a team of agents: `recon` /
 that tries to refute every candidate → an **exploiter** that chains confirmed
 issues into attack paths → a **reporter** → a **QA gate**. It ships a
 CVSS-scored report in which every finding traces to a reproduction. It runs inside
-[Claude Code](https://docs.claude.com/en/docs/claude-code/overview); the 68
+[Claude Code](https://docs.claude.com/en/docs/claude-code/overview); the 72
 deterministic tools are stdlib Python (Playwright is optional, for the browser channel).
 
 Unlike a scanner that trusts its own output, Redan verifies its own findings: a
@@ -124,7 +124,7 @@ CLAUDE.md                                         full project instructions
 
 - **[CLAUDE.md](CLAUDE.md)** — architecture, conventions, current state.
 - **[.claude/rules/](.claude/rules/)** — the doctrine: tradecraft, evidence standard, methodology, pitfalls, QA gate, rules of engagement.
-- **[tools/checks/README.md](tools/checks/README.md)** — the 68-tool catalog.
+- **[tools/checks/README.md](tools/checks/README.md)** — the 72-tool catalog.
 
 ## Running on other Anthropic-compatible backends
 
