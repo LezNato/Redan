@@ -173,13 +173,6 @@ the lesson preserved), and grep `report.md` to confirm the old claim survives
 nowhere as a live statement. (Memory-side mirror of §6: §6 says *where* content
 belongs; §9 says *delete the stale layer* so it stops being re-injected.)
 
-## When to load this file
-- Before chasing a lead toward a finding (pairs with `engagement-loop.md`).
-- Before tagging any finding `confirmed`.
-- Before writing or regenerating `report.md`.
-- During any post-run review where the operator pushed back on a finding —
-  record the failure mode under the relevant rule above.
-
 ## 10. Corroborate external claims — an uncorroborated CVE is a lead, not a fact
 
 A CVE id emitted by a research/scanner tool is a **claim**, not a verified fact. AI research
@@ -195,8 +188,15 @@ over-trusted search snippet then called it "hallucinated"; only GHSA/NVD/WPScan 
 resolved it.) The `plugin_cve_research` workflow enforces this with a ≥2-source
 corroboration gate; the QA gate's cve-corrob lens double-checks it.
 
+## When to load this file
+- Before chasing a lead toward a finding (pairs with `engagement-loop.md`).
+- Before tagging any finding `confirmed`.
+- Before writing or regenerating `report.md`.
+- During any post-run review where the operator pushed back on a finding —
+  record the failure mode under the relevant rule above.
+
 ## Cross-references
-- `engagement-loop.md` — the loop each rule plugs into (steps cite §1/§4/§5/§7/§8).
+- `engagement-loop.md` — the loop each rule plugs into (steps cite §1/§4/§5/§7/§8/§9).
 - `evidence-standard.md` — the finding-vs-lead bar §1 enforces.
 - `rules-of-engagement.md` — §3/§7 honor the scope + rate-limit limits.
 - `methodology.md` — the macro pipeline this doctrine disciplines.

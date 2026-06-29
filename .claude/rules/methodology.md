@@ -17,7 +17,7 @@ until the **verifier** has tried to refute them.
      candidate findings  ──►  [verifier]  ──►  survivors only
                                                    │
                                                    ▼
-                                              [reporter]  ──►  engagements/<name>/report.md
+                                              [reporter]  ──►  report.md  ──►  [qa-auditor] (PASS/BLOCK)  ──►  deliverable
 ```
 
 ## Phases
@@ -166,6 +166,12 @@ actually reaches the app:
   beats both the PoW and the graylist. (Login pages are often graylisted harder than the
   public site — a wp-login brute-force from a Tor exit is typically login-page-blocked; a
   residential proxy is the realistic attacker egress for that path.)
+- **Kit egress tooling (no Tor/provisioned proxy?).** `proxy_rotate.py <target>` sources
+  free public HTTP proxies (TheSpeedX/PROXY-List, ProxyScrape), tests them in parallel, and
+  returns ones that reach the target's edge; pass one to `browser_probe.py --proxy http://ip:port`
+  (or any Playwright `proxy={"server":...}`). The proxy beats the graylist; the browser beats
+  the PoW. **RoE: free proxies are unknown operators — recon only, never route
+  credentials/tokens/PII through them.**
 
 `waf_detect.py` routes the channel FIRST; on `js-challenge`, do not trust non-browser
 results. `browser_probe.py` is the deterministic browser-channel tool (DOM/forms/network/

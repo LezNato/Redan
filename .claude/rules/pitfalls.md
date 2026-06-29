@@ -164,7 +164,7 @@ the diff is a real business-rule violation. "Server accepted quantity=-1" is a l
 REAL payload via the working variant to demonstrate impact. A bypass that delivers nothing is info.
 
 **Clickjacking: frameable ≠ exploitable.** Frameable + a sensitive one-click state-changing action =
-the finding. Frameable + no sensitive action = informational (hardening, like F-07's missing XFO).
+the finding. Frameable + no sensitive action = informational (hardening — the same class as a missing X-Frame-Options header).
 
 **OOB callback ≠ the bug.** A callback proves the server made a request (SSRF/XXE reach); it does NOT
 prove reach to anything sensitive. Internal-reach to metadata/127.0.0.1 = the finding; a callback to

@@ -94,11 +94,12 @@ it's a false positive / already known / not actually exploitable) and an auditor
 that checks discipline (is "confirmed" earned? independent repro per §5? severity
 honest? in-scope and non-destructive?).
 - **Doctrine:** §5 (independent verification), §1 (tag).
-- **Tool:** the `verifier` agent — or a `Workflow` with a `skeptic` schema
-  `{verdict, strongest_refutation, reproduced}` and an `auditor` schema
-  `{confirmed_earned, severity_honest, roe_clean, independent_repro}`.
-- **Automatable:** this IS a workflow — the skeptic+auditor pair is the reusable
-  template. Only findings that survive proceed to the report.
+- **Tool:** the `verifier` agent — or an example skeptic/auditor lens pair
+  (skeptic: `{verdict, strongest_refutation, reproduced}`; auditor:
+  `{confirmed_earned, severity_honest, roe_clean, independent_repro}`).
+- **Automatable:** the committed implementations are the single-opus-verifier
+  verify stage in `pentest-assess.js` and the 5-lens `qa-gate.js` panel.
+  Only findings that survive proceed to the report.
 
 ### 8. Honest bookkeeping — capture, tag, close
 - **Tag** the outcome using the canonical dispositions (`evidence-standard.md`):

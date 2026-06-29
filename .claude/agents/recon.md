@@ -37,7 +37,9 @@ concurrently), `host_intel.py <ip>` (Shodan passive enrichment), `wayback_recon.
 <host>` (Wayback CDX historical surface), `framework_fingerprint.py <url>` (server-
 framework ID beyond the `Server:` banner), `subdomain_enum.py <domain>` (subfinder-style
 7-source passive subdomain enumeration + optional `--brute` wordlist, wildcard-guarded; feed
-its deduped surface to `takeover_probe` / `origin_discover`). Pass the discovered `web_surfaces` to
+its deduped surface to `takeover_probe` / `origin_discover`), `proxy_rotate.py <url>` (if the edge
+graylists your IP — TCP timeouts, not just a JS challenge — source a free HTTP-proxy egress; pair
+with `browser_probe --proxy http://<ip:port>` to clear both the graylist and any JS PoW). Pass the discovered `web_surfaces` to
 `web-tester` as leads. A
 disclosed version is a **lead**, not a finding. See `tools/checks/README.md`.
 

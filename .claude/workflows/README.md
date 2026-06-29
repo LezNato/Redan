@@ -11,7 +11,7 @@ Workflow({ name: 'qa-gate',        args: { engagement: 'acme' } })
 | Workflow | What | args |
 |---|---|---|
 | `pentest-assess` | Core web pipeline: parallel vuln-class **finders** (web-tester) → independent **verify** (opus) → confirmed/refuted survivors. Hand survivors to the reporter → findings.json → `render_report.py`. | `{target, engagement, browser_channel?, areas?}` |
-| `qa-gate` | Pre-delivery **QA gate** (`.claude/rules/qa-gate.md`): 5 parallel independent lenses (integrity / severity / CVE-corroboration / disposition+coverage / redaction+RoE) → arbiter → **PASS/BLOCK**. Defensive report QA. | `{engagement}` |
+| `qa-gate` | Pre-delivery **QA gate** (`.claude/rules/qa-gate.md`): mechanical pre-flight (`finding_schema` + `redact`, short-circuits to BLOCK) then 5 parallel independent lenses (integrity / severity / CVE-corroboration / disposition+coverage / redaction+RoE) -> arbiter -> **PASS/BLOCK**. | `{engagement}` |
 | `plugin_cve_research` | **Plugin CVE research** — systematic web research (NVD/Wordfence/Patchstack/WPScan) for a WP plugin inventory; >=2-source corroboration gate; fills the OSV WordPress-coverage gap. | `{plugins:[{slug,name,version},...]}` |
 | `toolkit-consistency-audit` | **Toolkit consistency audit** — repo-wide check for engagement hardcoding, stale refs, doc-code drift. | (none — scans the repo) |
 

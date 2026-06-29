@@ -10,8 +10,7 @@ Extends graphql_probe.py (introspection) with the attacker classes beyond schema
   --suggest  query with a deliberate typo ("users" instead of the real field) → many servers return
              "Did you mean 'user'?" → schema brute-force with introspection OFF.
 
-Usage: python graphql_adv.py <graphql-url> [--depth 10] [--batch 20] [--suggest] \\
-        [--typename-suggest __typename]
+Usage: python graphql_adv.py <graphql-url> [--depth 10] [--batch 20] [--suggest]
 """
 import sys, json, ssl, argparse, urllib.request, urllib.error, time
 

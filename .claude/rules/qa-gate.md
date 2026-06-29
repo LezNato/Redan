@@ -22,7 +22,7 @@ gate is the backstop for exactly those.
 > **[DIRECTIONAL]** = agent judgment, but must log a one-line reason.
 > **[RESERVED]** = operator-only — the agent SURFACES it and never decides.
 > Run the two mechanical validators first; they cover items 1 (index/reference
-> integrity), 2, 3, 4b, 5, 6: `python tools/checks/finding_schema.py
+> integrity), 2, 3, 5 (count-drift), 6: `python tools/checks/finding_schema.py
 > engagements/<name>/findings.json` and `python tools/checks/redact.py scan
 > engagements/<name>`. `finding_schema` now also catches **dangling finding-id
 > references** (a `ref` left behind after a move/downgrade, §9) and **summary-count
@@ -58,7 +58,7 @@ gate is the backstop for exactly those.
   read, not guessed; recorded in a separate step from the probe that produced it).
   See `evidence-standard.md` → Number integrity.
 
-**5. Disposition hygiene** (`evidence-standard.md` vocabulary) — **[MECHANICAL]** (`finding_schema.py`) + **[DIRECTIONAL]**
+**5. Disposition hygiene** (`evidence-standard.md` vocabulary) — **[DIRECTIONAL]** (count-drift via `finding_schema.py`; disposition placement/exclusion is agent-judged)
 - Canonical dispositions used; `refuted`/`duplicate`/`out-of-scope` items are NOT
   sitting in the Findings section.
 - Any downgrade REPLACED the prior claim (and the exec-summary count) — not left

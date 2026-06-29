@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 """_stealth.py — shared stealth-request helpers (stdlib only).
 
-The audit flagged that the kit uses a literal "authorized-recon" UA (a beacon — announces recon),
-cores×4 concurrent bursts, no jitter, single source IP. A real attacker blends (rotating UAs,
-jittered timing, header-order randomization, proxy rotation). This module is the opt-in stealth
-layer; tools import it and pass --stealth to reduce the detection footprint.
+Additional stealth for the detection-footprint-conscious: rotating browser UAs,
+jittered inter-request timing, header-order randomization, proxy/egress rotation.
+This module is the opt-in stealth layer; it is scaffolded and NOT yet wired into any
+tool (no --stealth flag exists yet).
 
   ua()               -> a realistic desktop browser UA (NOT a beacon)
   jitter(lo=0.2, hi=1.5) -> sleep a random float seconds (inter-request pacing)

@@ -11,7 +11,7 @@ Concurrent-first is definitive for ONE-SHOT races (>1 concurrent effect on a fre
 For CONTINUOUS/lost-update races, set --max-expected to the per-request effect count (e.g. K).
 The burst MUTATES state -> requires mutation_testing: approved.
 
-Usage: python race_probe.py --url <state-change-url> [--method POST] [--data 'k=v' | --json '{"k":"v"}'] \\
+Usage: python race_probe.py --url <state-change-url> [--method POST] [--data 'k=v'] \\
         --count-url <read-metric-url> --count-regex '(\\d+)' [--concurrency 20] [--max-expected 1]
 """
 import sys, json, ssl, re, argparse, urllib.request, threading

@@ -1,7 +1,5 @@
 # Evidence standard — what counts as a finding
 
-The single discipline that makes an AI-driven pentest trustworthy:
-
 > **Every FINDING traces to a reproduction. No reproduction → it is a LEAD, not
 > a finding, and it does not go in the report.**
 
@@ -39,7 +37,9 @@ Disposition says *what bucket*; `validation_status` says *how sure*, machine-che
 
 A confirmed finding should be `verified`. An `unconfirmed` item must carry a
 recommended follow-up test, and the `verifier` downgrades a non-`verified` High→
-Medium absent strong cause. Validated by `finding_schema.py`.
+Medium absent strong cause. The `validation_status` enum and severity-vs-CVSS-band are
+validated by `finding_schema.py`; the High→Medium downgrade itself is a verifier judgment
+(qa-gate item 3).
 
 ## A finding MUST have
 1. **Title + class** — what it is (e.g. "IDOR on /api/orders/{id}", CWE-639).

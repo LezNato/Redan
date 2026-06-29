@@ -6,8 +6,7 @@ Tests NoSQL injection (MongoDB/CouchDB/Firebase) via JSON operator injection
 a response that differs from the benign baseline when an operator is injected
 (boolean-based) or a timing delay from $where sleep-style operators.
 
-Usage: python nosql_probe.py <url> [--param user] [--json-field username]
-       [--auth-bypass] [--concurrency 4]
+Usage: python nosql_probe.py <url> [--param user] [--concurrency 4]
 """
 import argparse, json, sys, time, urllib.request, urllib.error, ssl, concurrent.futures
 

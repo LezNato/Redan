@@ -1,23 +1,37 @@
 #!/usr/bin/env python
 """browser_probe.py — systematic browser-based web testing via Playwright.
 
-Tests what urllib/curl CANNOT: DOM analysis, form detection, JS-execution
-monitoring, network-traffic capture, security-header validation, screenshot
-capture. Solves the JS-challenge-WAF + SPA gap (the browser solves the PoW,
-then same-origin fetches reach the real app). Requires: playwright + chromium.
+Tests what urllib/curl CANNOT: DOM analysis, form detection, network-traffic
+capture, security-header validation, screenshot capture. Solves the JS-challenge-WAF
++ SPA gap (the browser solves the PoW, then same-origin fetches reach the real app).
 
-Usage: python browser_probe.py <url> [--screenshot out.png] [--forms] [--headers] [--network]
+`--proxy` routes Chromium through a proxy sourced by `proxy_rotate.py` — the channel
+that beats BOTH a per-IP graylist (proxy restores TCP reach) AND a JS proof-of-work
+(the browser solves it). When the edge serves a challenge interstitial ("One moment,
+please..."), this tool waits for it to clear before reading the real page. Requires:
+playwright + chromium.
+
+Usage: python browser_probe.py <url> [--proxy http://ip:port] [--screenshot out.png]
+        [--no-forms|--no-headers|--no-network|--no-dom] [--timeout 30000]
 """
-import argparse, json, sys, re
+import argparse, json, sys
+
+CHALLENGE = "moment|checking your browser|just a moment"
+
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("url")
-    ap.add_argument("--screenshot", help="save a screenshot to this path")
-    ap.add_argument("--forms", action="store_true", default=True, help="detect + analyze forms")
-    ap.add_argument("--headers", action="store_true", default=True, help="validate security headers")
-    ap.add_argument("--network", action="store_true", default=True, help="capture network requests")
-    ap.add_argument("--dom", action="store_true", default=True, help="DOM analysis (scripts, inputs, sinks)")
+    ap.add_argument("--proxy", help="route Chromium through this proxy (http://ip:port) — pair with proxy_rotate.py for graylisted/JS-challenge edges")
+    ap.add_argument("--screenshot", help="save a full-page screenshot to this path")
+    ap.add_argument("--forms", dest="forms", action="store_true", default=True)
+    ap.add_argument("--no-forms", dest="forms", action="store_false")
+    ap.add_argument("--headers", dest="headers", action="store_true", default=True)
+    ap.add_argument("--no-headers", dest="headers", action="store_false")
+    ap.add_argument("--network", dest="network", action="store_true", default=True)
+    ap.add_argument("--no-network", dest="network", action="store_false")
+    ap.add_argument("--dom", dest="dom", action="store_true", default=True)
+    ap.add_argument("--no-dom", dest="dom", action="store_false")
     ap.add_argument("--timeout", type=int, default=30000)
     args = ap.parse_args()
     try:
@@ -25,53 +39,69 @@ def main():
     except ImportError:
         print(json.dumps({"target": args.url, "ok": False, "error": "playwright not installed: pip install playwright && playwright install chromium"})); sys.exit(1)
 
-    result = {"target": args.url, "ok": True, "forms": [], "security_headers": {}, "network": [], "dom": {}, "screenshot": None}
+    import re
+    chall_re = re.compile(CHALLENGE, re.I)
+    result = {"target": args.url, "ok": True, "proxy": args.proxy, "forms": [], "security_headers": {}, "network": [], "dom": {}, "screenshot": None}
     with sync_playwright() as p:
-        b = p.chromium.launch(headless=True, args=["--disable-blink-features=AutomationControlled"])
+        launch_kw = {"headless": True, "args": ["--disable-blink-features=AutomationControlled"]}
+        if args.proxy:
+            launch_kw["proxy"] = {"server": args.proxy}
+        b = p.chromium.launch(**launch_kw)
         ctx = b.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
         pg = ctx.new_page()
         reqs = []
         pg.on("request", lambda r: reqs.append({"url": r.url[:200], "method": r.method, "rtype": r.resource_type}) if len(reqs) < 100 else None)
         try:
-            pg.goto(args.url, wait_until="networkidle", timeout=args.timeout)
+            pg.goto(args.url, wait_until="domcontentloaded", timeout=args.timeout)
         except Exception as e:
             result["nav_warning"] = str(e)[:200]
-        # forms
+        # if the edge served a JS proof-of-work, wait for it to clear before reading the page
+        try:
+            if chall_re.search(pg.title() or ""):
+                pg.wait_for_function("() => !/moment|checking your browser|just a moment/i.test(document.title || '')", timeout=args.timeout)
+                result["challenge_solved"] = True
+        except Exception as e:
+            result["challenge_solved"] = False
+            result["challenge_wait_error"] = str(e)[:150]
+        result["final_title"] = (pg.title() or "")[:120]
+        result["final_url"] = pg.url
         if args.forms:
-            for f in pg.query_selector_all("form"):
-                inputs = [{"name": i.get_attribute("name"), "type": i.get_attribute("type"), "value": (i.get_attribute("value") or "")[:50]} for i in f.query_selector_all("input,select,textarea")]
-                result["forms"].append({"action": f.get_attribute("action"), "method": (f.get_attribute("method") or "GET").upper(), "inputs": inputs[:20]})
-        # security headers
+            try:
+                for f in pg.query_selector_all("form"):
+                    inputs = [{"name": i.get_attribute("name"), "type": i.get_attribute("type"), "value": (i.get_attribute("value") or "")[:50]} for i in f.query_selector_all("input,select,textarea")]
+                    result["forms"].append({"action": f.get_attribute("action"), "method": (f.get_attribute("method") or "GET").upper(), "inputs": inputs[:20]})
+            except Exception as e:
+                result["forms_error"] = str(e)[:150]
+        # security headers via same-origin fetch (carries the edge-clearance cookie post-challenge)
         if args.headers:
-            hdrs = {k.lower(): v for k, v in (pg.evaluate("()=>{const r=new XMLHttpRequest();r.open('GET',location.href,false);try{r.send()}catch(e){}return r.getAllResponseHeaders()}") or "").split("\r\n") if ": " in (k + ": " + v)} if False else {}
-            # simpler: just check the page response headers we can see
-            for h in ["content-security-policy", "x-frame-options", "strict-transport-security", "x-content-type-options", "referrer-policy", "permissions-policy"]:
-                v = pg.evaluate(f'()=>{{try{{const r=await fetch(location.href);return r.headers.get("{h}")}}catch(e){{return null}}}}') if False else None
-            # use response headers from the navigation
-            resp = pg.evaluate("async()=>{const r=await fetch(location.href);const h={};r.headers.forEach((v,k)=>h[k]=v);return h}")
-            for h in ["content-security-policy","x-frame-options","strict-transport-security","x-content-type-options","referrer-policy","permissions-policy"]:
-                result["security_headers"][h] = resp.get(h)
-        # network
+            try:
+                resp = pg.evaluate("async()=>{try{const r=await fetch(location.href);const h={};r.headers.forEach((v,k)=>h[k]=v);return h}catch(e){return {}}}")
+                for h in ["content-security-policy", "x-frame-options", "strict-transport-security", "x-content-type-options", "referrer-policy", "permissions-policy"]:
+                    result["security_headers"][h] = resp.get(h)
+                result["server"] = resp.get("server")
+            except Exception as e:
+                result["headers_error"] = str(e)[:150]
         if args.network:
             result["network"] = reqs[:50]
-        # DOM
         if args.dom:
-            result["dom"] = pg.evaluate("""()=>({
-                title: document.title,
-                scripts: Array.from(document.querySelectorAll('script[src]')).map(s=>s.src).slice(0,20),
-                inputs: document.querySelectorAll('input').length,
-                forms: document.querySelectorAll('form').length,
-                iframes: document.querySelectorAll('iframe').length,
-                postMessage: document.querySelectorAll('[onmessage]').length,
-                innerHTML_sinks: document.querySelectorAll('[innerHTML]').length,
-                eval_calls: performance.getEntriesByType('resource').filter(e=>e.name.includes('eval')).length,
-                js_frameworks: [...new Set([d for(d in window)if/^(React|Vue|Angular|jQuery|Backbone|Ember|Svelte|Next|Nuxt)/.test(d)])].slice(0,5)
-            })""")
+            try:
+                result["dom"] = pg.evaluate("""()=>({
+                    title: document.title,
+                    scripts: Array.from(document.querySelectorAll('script[src]')).map(s=>s.src).slice(0,20),
+                    inputs: document.querySelectorAll('input').length,
+                    forms: document.querySelectorAll('form').length,
+                    iframes: document.querySelectorAll('iframe').length,
+                    wp_content: !!document.querySelector('link[href*="wp-content"],script[src*="wp-content"]'),
+                    js_frameworks: [...new Set(Object.keys(window).filter(d=>/^(React|Vue|Angular|jQuery|Backbone|Ember|Svelte|Next|Nuxt)/.test(d)))].slice(0,5)
+                })""")
+            except Exception as e:
+                result["dom_error"] = str(e)[:150]
         if args.screenshot:
             pg.screenshot(path=args.screenshot, full_page=True)
             result["screenshot"] = args.screenshot
         b.close()
     print(json.dumps(result, indent=2))
+
 
 if __name__ == "__main__":
     main()

@@ -19,7 +19,7 @@ Redan runs a black-box web/API assessment as a team of agents: `recon` /
 that tries to refute every candidate → an **exploiter** that chains confirmed
 issues into attack paths → a **reporter** → a **QA gate**. It ships a
 CVSS-scored report in which every finding traces to a reproduction. It runs inside
-[Claude Code](https://docs.claude.com/en/docs/claude-code/overview); the 67
+[Claude Code](https://docs.claude.com/en/docs/claude-code/overview); the 68
 deterministic tools are stdlib Python (Playwright is optional, for the browser channel).
 
 Unlike a scanner that trusts its own output, Redan verifies its own findings: a
@@ -33,13 +33,13 @@ findings.
 2. `/pentest-init <slug>` — scaffolds `engagements/<slug>/` (`scope.yaml` + `authorization.md`). No active testing until a signed basis is recorded.
 3. `cp engagements/<slug>/scope.yaml scope.yaml` — activate the engagement.
 4. `/pentest <target>` — recon → active finders (parallel) → `verifier` → (optional) `exploiter` → `reporter`.
-5. `/pentest-report` — `findings.json` → `report.md` + standalone HTML + PDF.
+5. `/pentest-report` — `findings.json` → `report.md` + standalone HTML (dark); PDF is a separate headless-browser print step.
 6. `/pentest-qa` — a report isn't final until the QA gate returns `PASS`.
 
 ## Prerequisites
 
 - **[Claude Code](https://docs.claude.com/en/docs/claude-code/overview)** (the CLI).
-- **Python 3.10+** — the 67 tools are stdlib-only.
+- **Python 3.10+** — the 68 tools are stdlib Python.
 - **Playwright** *(only for the browser-channel agents + `browser_probe.py`; the stdlib tools run without it)*:
   ```sh
   pip install playwright && playwright install chromium
@@ -63,7 +63,8 @@ scope.yaml -> /pentest -> recon · web-tester · auth-tester · cloud-iam
 ```
 
 - **8 agents** (`.claude/agents/`) — finders → `verifier` (refute) → `exploiter` (chains) → `reporter` → `qa-auditor`. Mixed-model: `sonnet` finders, `opus` judgment.
-- **67 stdlib modules** (`tools/checks/`, stdlib-only, JSON) — recon, active testing (injection, XSS, SSRF, access control, request smuggling, file upload, SOAP/XXE, rate limiting, JWT, …), authenticated testing, and reporting. Full catalog: [`tools/checks/README.md`](tools/checks/README.md).
+- **68 stdlib modules** (`tools/checks/`, stdlib-only, JSON) — recon, active testing (injection, XSS, SSRF, access control, request smuggling, file upload, SOAP/XXE, rate limiting, JWT, …), authenticated testing, edge-egress rotation, and reporting. Full catalog: [`tools/checks/README.md`](tools/checks/README.md).
+- **Edge-egress rotation** — `proxy_rotate.py` sources free public HTTP proxies to beat per-IP graylists; `browser_probe.py --proxy` routes headless Chromium through them to solve JS proof-of-work challenges (beats BOTH an Imunify360 graylist AND its JS PoW — no Tor required).
 - **Chain exploitation** — the `exploiter` combines confirmed issues into full attack chains (JWT-forge→account takeover, SSRF→internal metadata, IDOR at scale).
 - **Reporting** — `findings.json` → `report.md` + standalone HTML (CSS + evidence inlined — one file, no loose artifacts) + PDF. Per-finding OWASP/WSTG/ATT&CK + CVSS/CWE. Export → SARIF / Jira / DefectDojo.
 - **QA gate** — mechanical pre-flight (`finding_schema` + `redact`) → 5-lens panel → `PASS`/`BLOCK`.
@@ -71,9 +72,9 @@ scope.yaml -> /pentest -> recon · web-tester · auth-tester · cloud-iam
 <details>
 <summary><b>Sample finding</b> — what a confirmed finding looks like in the report</summary>
 
-> **F-01 — IDOR on /api/orders/{id}** &nbsp; `CRITICAL · 9.1` &nbsp; CWE-639 · WSTG-ATHZ-04
+> **F-01 — IDOR on /api/orders/{id}** &nbsp; `HIGH · 7.4` &nbsp; CWE-639 · WSTG-ATHZ-04
 >
-> **Location:** `GET /api/orders/{id}` &nbsp;·&nbsp; **CVSS 3.1:** `AV:N/AC:L/PR:L/UI:N/S:C/C:H/I:N/A:N` — 9.1
+> **Location:** `GET /api/orders/{id}` &nbsp;·&nbsp; **CVSS 3.1:** `AV:N/AC:L/PR:L/UI:N/S:C/C:H/I:N/A:N` — 7.4
 >
 > The endpoint authorizes by session but doesn't scope the object id to the caller's tenant; a low-priv session reads another tenant's order (PII).
 >
@@ -107,7 +108,7 @@ A black-box test proves what it *found*, not that *no vulnerability exists*. A r
 
 ```
 .claude/{agents,rules,skills,workflows,hooks}/   the ensemble + doctrine + orchestration
-tools/checks/                                     67 stdlib modules (stdlib-only, JSON)
+tools/checks/                                     68 stdlib modules (stdlib-only, JSON)
 tools/report-render/                              findings.json -> report.md/html + SARIF/Jira/DefectDojo
 tools/external/                                   nuclei + sqlmap binaries (gitignored, bootstrapped)
 engagements/_template/                            per-engagement scaffold (copied by /pentest-init)
@@ -120,7 +121,7 @@ CLAUDE.md                                         full project instructions
 
 - **[CLAUDE.md](CLAUDE.md)** — architecture, conventions, current state.
 - **[.claude/rules/](.claude/rules/)** — the doctrine: tradecraft, evidence standard, methodology, pitfalls, QA gate, rules of engagement.
-- **[tools/checks/README.md](tools/checks/README.md)** — the 67-tool catalog.
+- **[tools/checks/README.md](tools/checks/README.md)** — the 68-tool catalog.
 
 ## Running on other Anthropic-compatible backends
 

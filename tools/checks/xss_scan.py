@@ -7,7 +7,7 @@ response (necessary), (2) the context it lands in (HTML/attr/script/JS),
 findings. For DOM-based XSS, pairs with browser_probe.py (headless execution).
 
 Usage: python xss_scan.py <url> [--param name] [--method GET|POST]
-       [--data 'k=v'] [--concurrency 6] [--context-aware]
+       [--data 'k=v'] [--concurrency 6]
 """
 import argparse, json, sys, urllib.request, urllib.parse, urllib.error, ssl, concurrent.futures, re, html
 

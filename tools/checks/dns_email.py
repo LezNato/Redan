@@ -1,9 +1,11 @@
 #!/usr/bin/env python
-"""dns_email.py — deterministic DNS + email-security (SPF/DMARC/DKIM) check.
+"""dns_email.py — deterministic DNS + email-security (SPF/DMARC/DKIM/CAA/DNSSEC) check.
 
-Uses the system `nslookup` (no Python DNS deps). Reports A/AAAA/NS/MX, the SPF
-record, the DMARC policy, and which common DKIM selectors resolve — flagging the
-classic email-spoofing gaps (no DMARC / p=none, missing/!-all SPF). Emits JSON.
+Uses the system `nslookup` for basic records, supplemented by DNS-over-HTTPS
+(Google dns.google) for CAA + DNSSEC posture (record types Windows nslookup cannot
+parse). Reports A/AAAA/NS/MX, the SPF record, the DMARC policy, which common DKIM
+selectors resolve, CAA issuers, and DNSSEC ad-flag — flagging the classic
+email-spoofing gaps (no DMARC / p=none, missing/!-all SPF). Emits JSON.
 
 Usage: python dns_email.py <domain>
 """

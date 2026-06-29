@@ -3,7 +3,7 @@
 
 The kit drives an ATTACKER browser but never proves XSS in a VICTIM context. This generates XSS
 payloads that exfiltrate document.cookie / localStorage / a CSRF token to an OOB callback (from
-tools/checks/oob.py), across contexts (raw HTML, attribute, inside JS, inside <script>, + a
+tools/checks/oob.py), across contexts (raw HTML, attribute, inside JS, inside <script>, a DOM/location.hash sink, + a
 polyglot). Inject the payload, RENDER it in a browser (web-tester/exploiter), then poll oob.py for
 the callback — a callback carrying a cookie = end-to-end confirmed XSS (CWE-79), not just reflection.
 

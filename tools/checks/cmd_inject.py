@@ -2,7 +2,7 @@
 """cmd_inject.py — command injection tester (Commix-style).
 
 Tests OS-command injection via timing (sleep-based) + error markers across
-common injection points (;, |, &&, ||, backticks, $(), newline). Time-based
+common injection points (;, |, &&, backticks, $(), newline). Time-based
 is the primary signal (a controlled delay = the command executed).
 
 Usage: python cmd_inject.py <url> [--param name] [--method GET|POST]

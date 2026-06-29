@@ -37,7 +37,10 @@ admin, or dev apps), not just `:443`. Also run `sri_check.py <url>` (third-party
 SRI / supply-chain — missing-SRI + no-CSP + cookie-reading script) and
 `header_probe.py <url>` (host-header / CRLF / method-override / off-origin open-redirect
 battery, each with a built-in control) — both ACTIVE; through a JS-challenge WAF, re-test
-their positives via the browser (urllib is blind). Also `cors_probe.py <url>` (reflected
+their positives via the browser (urllib is blind). If the edge GRAYLISTS your IP (TCP
+timeouts, not just a JS challenge), `proxy_rotate.py <url>` sources a free HTTP-proxy egress; route
+`browser_probe.py --proxy http://<ip:port>` through it to clear both the graylist and any JS PoW.
+Also `cors_probe.py <url>` (reflected
 arbitrary Origin + Allow-Credentials — note: browsers FORBID setting the Origin header, so
 cross-origin CORS reflection must be tested via curl/urllib, not the browser) and, on any
 captured JWT, `jwt_probe.py --header "Authorization: Bearer <jwt>"` (analyzer: alg:none /

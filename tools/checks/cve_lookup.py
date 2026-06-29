@@ -48,7 +48,7 @@ def osv(ecosystem, name, version, timeout=15):
         except Exception:
             msg = str(e)
         return {"vulns": [], "source": "osv", "coverage_gap": True,
-                "coverage_gap_reason": f"OSV HTTP {e.code}: {msg} -- OSV does not cover this ecosystem; not 'no CVEs'"}
+                "coverage_gap_reason": f"OSV HTTP {e.code}: {msg} —OSV does not cover this ecosystem; not 'no CVEs'"}
     except Exception as e:
         return {"vulns": [], "source": "osv", "coverage_gap": True,
                 "coverage_gap_reason": f"OSV query failed: {e}"}
@@ -62,7 +62,7 @@ def osv(ecosystem, name, version, timeout=15):
 
 
 def lookup(ecosystem, name, version, timeout=15):
-    """Ecosystem-aware lookup. WP ecosystems are a known coverage gap -- flagged, not hidden."""
+    """Ecosystem-aware lookup. WP ecosystems are a known coverage gap —flagged, not hidden."""
     eco = (ecosystem or "").strip()
     r = osv(eco, name, version, timeout)
     if eco.lower() in WP_ECOSYSTEMS:
@@ -116,7 +116,7 @@ def fingerprint(url):
         if n:
             findings.append({"id": "vulnerable-component", "severity": "medium",
                              "cve": ",".join(v["id"] for v in r["vulns"][:6]),
-                             "detail": f"{name} {ver} -- {n} known vuln(s) (OSV): "
+                             "detail": f"{name} {ver} —{n} known vuln(s) (OSV): "
                                        + ", ".join(v["id"] for v in r["vulns"][:6])})
     note = "version->CVE is a LEAD until exploitability/reachability is confirmed (pitfalls.md)"
     return {"target": url, "ok": True, "components": comps, "findings": findings, "note": note}

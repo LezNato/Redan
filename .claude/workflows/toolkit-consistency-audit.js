@@ -1,6 +1,6 @@
 export const meta = {
   name: 'toolkit-consistency-audit',
-  description: 'Audit the entire toolkit for project-agnostic consistency — no engagement-specific hardcoding, stale refs, doc-code drift',
+  description: 'Audit the entire toolkit for project-agnostic consistency -- no engagement-specific hardcoding, stale refs, doc-code drift',
   phases: [
     { title: 'Audit', detail: '6 parallel lenses scan the whole repo' },
     { title: 'Synthesize', detail: 'prioritized fix list + consistency verdict' },
@@ -46,11 +46,11 @@ const SYNTH_SCHEMA = {
 phase('Audit');
 
 const lenses = [
-  { label: 'project-contamination', prompt: SCOPE + '\n\nROLE: project-contamination scanner. Use Grep/Read. Search for ANY engagement-specific references in the toolkit code and docs (NOT in engagements/ or .lab/) — real target domains, real IP prefixes, plugin/theme names pinned to specific X.Y.Z versions, admin-style usernames, or operator handles. Any identifier that reads like a real prior target rather than a generic example, appearing in a tool/rule/agent/skill (not an engagement), is contamination. Report each with file, issue, fix. Keep the private deny-list out-of-tree under $PENTEST_AUTH_HOME (gitignored), never in the repo.' },
+  { label: 'project-contamination', prompt: SCOPE + '\n\nROLE: project-contamination scanner. Use Grep/Read. Search for ANY engagement-specific references in the toolkit code and docs (NOT in engagements/ or .lab/) -- real target domains, real IP prefixes, plugin/theme names pinned to specific X.Y.Z versions, admin-style usernames, or operator handles. Any identifier that reads like a real prior target rather than a generic example, appearing in a tool/rule/agent/skill (not an engagement), is contamination. Report each with file, issue, fix. Keep the private deny-list out-of-tree under $PENTEST_AUTH_HOME (gitignored), never in the repo.' },
 
   { label: 'cross-ref-integrity', prompt: SCOPE + '\n\nROLE: cross-reference integrity auditor. Use Grep/Read. Verify every cross-reference BETWEEN docs is valid: CLAUDE.md references to tools/rules/agents exist at named paths. methodology.md and pitfalls.md cross-refs to each other and to specific tools are correct. Agent files reference tools by name that exist. /pentest SKILL references phases, agents, workflows that exist. Workflow scripts reference tool names that exist. cve_lookup references plugin_cve_research workflow that exists. Report any broken refs.' },
 
-  { label: 'doc-code-drift', prompt: SCOPE + '\n\nROLE: doc-code drift auditor. Use Grep/Read. Check mismatches between docs and code: CLAUDE.md states a tool count in Current state — count actual tools/checks/*.py and confirm the documented number matches the real count exactly. CLAUDE.md says 8 agents, count .claude/agents/*.md. The tool table in tools/checks/README.md lists ALL tools. The dispatch table in methodology.md names tools that exist. render_report.py supports logo/theme/embed as documented. Report any drift.' },
+  { label: 'doc-code-drift', prompt: SCOPE + '\n\nROLE: doc-code drift auditor. Use Grep/Read. Check mismatches between docs and code: CLAUDE.md states a tool count in Current state -- count actual tools/checks/*.py and confirm the documented number matches the real count exactly. CLAUDE.md says 8 agents, count .claude/agents/*.md. The tool table in tools/checks/README.md lists ALL tools. The dispatch table in methodology.md names tools that exist. render_report.py supports logo/theme/embed as documented. Report any drift.' },
 
   { label: 'naming-consistency', prompt: SCOPE + '\n\nROLE: naming-consistency auditor. Use Grep/Read. Check: tool CLI signatures consistent (positional vs flagged args). JSON output shape consistent ({target, ok, findings, note}) across tools. Agent frontmatter consistent (name, description, model, tools). Workflow meta consistent (name, description, phases). Skill frontmatter consistent. Report inconsistencies.' },
 

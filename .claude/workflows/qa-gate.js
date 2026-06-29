@@ -2,7 +2,7 @@ export const meta = {
   name: 'qa-gate',
   description: 'Pre-delivery QA gate (.claude/rules/qa-gate.md): parallel adversarial lenses audit a COMPLETED engagement report -> PASS / BLOCK. Defensive report quality-assurance. args: {engagement: "<slug>"} (default reads engagements/<slug>/).',
   phases: [
-    { title: 'Preflight', detail: 'mechanical validators (finding_schema + redact) — short-circuit BLOCK if they fail' },
+    { title: 'Preflight', detail: 'mechanical validators (finding_schema + redact) -- short-circuit BLOCK if they fail' },
     { title: 'Audit', detail: 'parallel QA lenses, one per qa-gate.md dimension' },
     { title: 'Verdict', detail: 'synthesize PASS/BLOCK + blocking issues' },
   ],
@@ -15,17 +15,17 @@ export const meta = {
 // Workflow({name|scriptPath, args}) form fails to inject the args global.
 let ENG = args && args.engagement
 if (!ENG) {
-  log('args.engagement not received (harness args-dropping?) — self-discovering from scope.yaml')
+  log('args.engagement not received (harness args-dropping?) -- self-discovering from scope.yaml')
   const SCOPE_SCHEMA = { type:'object', additionalProperties:false, properties:{ engagement:{type:'string'} }, required:['engagement'] }
   const found = await agent(
-    'Read scope.yaml in the repository root (the active-engagement gate). Under the top-level "engagement:" block there is a "name:" field — return that slug. If scope.yaml is unreadable or has no engagement.name, return engagement="". Return {engagement}.',
+    'Read scope.yaml in the repository root (the active-engagement gate). Under the top-level "engagement:" block there is a "name:" field -- return that slug. If scope.yaml is unreadable or has no engagement.name, return engagement="". Return {engagement}.',
     { label:'scope-read', schema: SCOPE_SCHEMA }).catch(() => null)
   ENG = found && found.engagement
 }
 if (!ENG) { return { error: 'no engagement slug. Pass args.engagement = "<slug>", or ensure scope.yaml has engagement.name (the self-discovery fallback).' } }
 const DIR = `engagements/${ENG}`
 
-const CTX = `You are a QA AUDITOR running the pre-delivery quality gate (.claude/rules/qa-gate.md) on a COMPLETED penetration-test report before it is treated as client-deliverable. This is DEFENSIVE report quality-assurance — you are checking a FINISHED report for accuracy, completeness, and discipline; you are NOT testing a live target or exploiting anything. Read the deliverable at ${DIR}/{findings.json, report.md, evidence/}. Be adversarial about QUALITY: a single real defect is a BLOCK. Cite specifics (finding id, line, file).`
+const CTX = `You are a QA AUDITOR running the pre-delivery quality gate (.claude/rules/qa-gate.md) on a COMPLETED penetration-test report before it is treated as client-deliverable. This is DEFENSIVE report quality-assurance -- you are checking a FINISHED report for accuracy, completeness, and discipline; you are NOT testing a live target or exploiting anything. Read the deliverable at ${DIR}/{findings.json, report.md, evidence/}. Be adversarial about QUALITY: a single real defect is a BLOCK. Cite specifics (finding id, line, file).`
 
 const SCHEMA = { type:'object', properties:{
   dimension:{type:'string'},
@@ -37,32 +37,32 @@ const SCHEMA = { type:'object', properties:{
 const LENSES = [
   {k:'integrity', p:`DELIVERABLE INTEGRITY + FINDING COMPLETENESS (qa-gate items 1-2). Run: python tools/checks/finding_schema.py ${DIR}/findings.json . Confirm report.md/report.html exist; every confirmed finding has location, reproduction, evidence artifact (verify the referenced files exist under ${DIR}/evidence/ with ls/Glob), CVSS vector+score, CWE, concrete impact, remediation, verification note. Any finding lacking a reproduction must be a Lead, not a Finding.`},
   {k:'severity', p:'SEVERITY DISCIPLINE + NUMBER INTEGRITY (qa-gate items 3, 4b). Confirm no severity is inflated ABOVE its CVSS band (down-rating is allowed); exec-summary counts EQUAL the actual findings by severity; each finding carries validation_status and a non-verified High is justified; a component finding rated below its advisory CVSS (e.g. retained as a labeled component score) is explained. Every CVSS/CWE/count traces to an evidence source.'},
-  {k:'cve-corrob', p:'EXTERNAL-CLAIM / CVE CORROBORATION (qa-gate item 4). For each CVE id cited: WebSearch for >=2 authoritative sources (NVD / GitHub Advisory / WPScan / vendor) and note corroboration. Every CVE that postdates the tester knowledge cutoff MUST be FLAGGED in the report for WPScan/NVD confirmation — verify the report does so. Confirm component findings state exploitation was NOT performed where true (no implied live exploit a version-match did not demonstrate).'},
-  {k:'disposition-coverage', p:'DISPOSITION HYGIENE + COVERAGE HONESTY (qa-gate items 5, 7). Canonical dispositions only; no refuted/duplicate/out-of-scope items sitting in Findings; any downgrade REPLACED the prior claim (no stale "High" left inline, exec counts fixed). Confirm the report STATES its coverage limitations honestly (what was not tested + why) — a skipped test is a stated gap, not a clean result. If a standards coverage matrix (section 4) is present, verify it does not claim Tested where coverage was only Partial.'},
+  {k:'cve-corrob', p:'EXTERNAL-CLAIM / CVE CORROBORATION (qa-gate item 4). For each CVE id cited: WebSearch for >=2 authoritative sources (NVD / GitHub Advisory / WPScan / vendor) and note corroboration. Every CVE that postdates the tester knowledge cutoff MUST be FLAGGED in the report for WPScan/NVD confirmation -- verify the report does so. Confirm component findings state exploitation was NOT performed where true (no implied live exploit a version-match did not demonstrate).'},
+  {k:'disposition-coverage', p:'DISPOSITION HYGIENE + COVERAGE HONESTY (qa-gate items 5, 7). Canonical dispositions only; no refuted/duplicate/out-of-scope items sitting in Findings; any downgrade REPLACED the prior claim (no stale "High" left inline, exec counts fixed). Confirm the report STATES its coverage limitations honestly (what was not tested + why) -- a skipped test is a stated gap, not a clean result. If a standards coverage matrix (section 4) is present, verify it does not claim Tested where coverage was only Partial.'},
   {k:'redaction-roe', p:`REDACTION + RoE (qa-gate items 6, 8). Run: python tools/checks/redact.py scan ${DIR} (must exit 0 / clean = no Authorization/Cookie/Set-Cookie/JWT/api_key/password material anywhere in the tree). Confirm the report RoE narrative is truthful: non-destructive unless active exploitation was authorized (scope mutation_testing approved); any state-changing action was a no-op/minimal proof; on real user PII only minimal proof was taken. Flag any place the report implies an exploit or impact it did not actually demonstrate.`},
 ]
 
 // --- mechanical pre-flight: the deterministic validators gate the expensive LLM panel.
 // finding_schema.py now catches structure / band-inflation / count-drift / DANGLING REFS /
 // summary-count integrity; redact.py catches credential leaks. If either fails, BLOCK on ONE
-// cheap agent instead of spending the 5-lens Opus panel (those defects are deterministic).
+// single sonnet agent instead of spending the 5-lens Opus panel (those defects are deterministic).
 phase('Preflight')
 const PRE = { type:'object', properties:{
   schema_valid:{type:'boolean'}, schema_errors:{type:'array', items:{type:'string'}},
   redact_clean:{type:'boolean'}, redact_detail:{type:'string'} }, required:['schema_valid','redact_clean'] }
 const pre = await agent(
-  `Run EXACTLY these two commands and report their results — do nothing else, do NOT test any live target:\n` +
+  `Run EXACTLY these two commands and report their results -- do nothing else, do NOT test any live target:\n` +
   `1) python tools/checks/finding_schema.py ${DIR}/findings.json  (read the JSON 'valid' + 'errors')\n` +
   `2) python tools/checks/redact.py scan ${DIR}  (redact_clean = true iff exit code 0)\n` +
   `Return {schema_valid, schema_errors, redact_clean, redact_detail}.`,
-  { label:'qa:preflight', phase:'Preflight', agentType:'qa-auditor', schema: PRE })
+  { label:'qa:preflight', phase:'Preflight', agentType:'qa-auditor', model: 'sonnet', schema: PRE })
 if (pre && (!pre.schema_valid || !pre.redact_clean)) {
-  log('mechanical pre-flight FAILED — blocking before the LLM panel (saves the Opus panel)')
+  log('mechanical pre-flight FAILED -- blocking before the LLM panel (saves the Opus panel)')
   return { engagement: ENG, gate: 'BLOCK', preflight: pre,
     blocking_issues: [
       ...(pre.schema_valid ? [] : (pre.schema_errors || ['finding_schema invalid']).map(e => ({dimension:'mechanical: finding_schema', detail:e}))),
       ...(pre.redact_clean ? [] : [{dimension:'mechanical: redaction', detail: pre.redact_detail || 'redact scan found credential material'}]) ],
-    note: 'Mechanical validators failed — fix and re-run; the LLM panel was skipped to save tokens.' }
+    note: 'Mechanical validators failed -- fix and re-run; the LLM panel was skipped to save tokens.' }
 }
 
 phase('Audit')
