@@ -9,20 +9,13 @@ state-changing/sensitive action sits on the frameable page (the operator confirm
 
 Usage: python clickjack_probe.py <url> [--action-label "Delete account"] [--out poc.html]
 """
-import sys, json, ssl, re, argparse, urllib.request, urllib.error
-
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
-_CTX = ssl.create_default_context(); _CTX.check_hostname = False; _CTX.verify_mode = ssl.CERT_NONE
+import os, sys, json, re, argparse
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _http import get as http_get
 
 def headers_of(url):
-    try:
-        r = urllib.request.urlopen(urllib.request.Request(url, method="GET", headers={"User-Agent": UA}),
-                                   timeout=12, context=_CTX)
-        return r.status, {k.lower(): v for k, v in r.headers.items()}
-    except urllib.error.HTTPError as e:
-        return e.code, {k.lower(): v for k, v in (e.headers or {}).items()}
-    except Exception as e:
-        return None, {}
+    r = http_get(url, timeout=12)
+    return (None, {}) if r.error else (r.status, r.headers)  # r.headers is lower-cased
 
 def check(url, action_label):
     s, h = headers_of(url)

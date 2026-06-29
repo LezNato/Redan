@@ -10,21 +10,17 @@ Usage: python sri_check.py <url> [--html <captured.html>]
   (--html: parse a pre-captured HTML file instead of fetching — needed when a JS-challenge
    WAF makes urllib blind to the real page; pair with http_headers.py to confirm CSP absence)
 """
-import sys, json, re, ssl, argparse, urllib.request, urllib.parse
-
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+import os, sys, json, re, argparse, urllib.parse
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _http import get as http_get
 SINK_RE = re.compile(r"document\.cookie|localStorage|sessionStorage|\.fetch\(|XMLHttpRequest|sendBeacon|postMessage|\beval\(|innerHTML", re.I)
 SCRIPT_RE = re.compile(r'<script[^>]*\bsrc=["\']([^"\']+)["\'][^>]*>', re.I)
 INTEGRITY_RE = re.compile(r'\bintegrity=["\']', re.I)
 CSP_META_RE = re.compile(r'<meta[^>]+http-equiv=["\']?Content-Security-Policy["\']?', re.I)
 
 def fetch(url, timeout=15):
-    ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
-    try:
-        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": UA}), timeout=timeout, context=ctx) as r:
-            return r.read().decode("utf-8", "replace")
-    except Exception:
-        return ""
+    r = http_get(url, timeout=timeout, max_body=5_000_000)
+    return "" if (r.error or r.status >= 400) else r.text
 
 def check(url, html_override=None):
     html = html_override if html_override is not None else fetch(url)

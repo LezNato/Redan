@@ -10,7 +10,9 @@ object-src/base-uri, nonce+unsafe-inline conflicts, mixed http: sources.
 Usage: python csp_probe.py <url> [--header "Cookie: ..."]
        python csp_probe.py --policy "<raw-csp-string>"
 """
-import argparse, json, urllib.request, urllib.error, ssl
+import os, sys, argparse, json
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _http import get as http_get
 
 # CSP keywords are single-QUOTE-delimited tokens ('unsafe-inline', 'unsafe-eval',
 # 'nonce-...', 'sha256-...', 'none'). Membership tests MUST compare against the
@@ -179,22 +181,16 @@ def verdict_for(directives, issues):
     return "CSP present, no obvious bypass"
 
 
-def fetch_csp(url, extra_header, ctx, timeout):
+def fetch_csp(url, extra_header, timeout):
     """Fetch a URL and return (status, raw_csp_header_or_None, error_or_None)."""
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"})
+    headers = {}
     if extra_header:
         name, _, val = extra_header.partition(":")
-        req.add_header(name.strip(), val.strip())
-    try:
-        with urllib.request.urlopen(req, context=ctx, timeout=timeout) as r:
-            # headers may have multiple CSP entries; join them
-            csp = r.headers.get("Content-Security-Policy")
-            return r.status, csp, None
-    except urllib.error.HTTPError as e:
-        csp = e.headers.get("Content-Security-Policy") if e.headers else None
-        return e.code, csp, None
-    except Exception as e:
-        return None, None, str(e)[:160]
+        headers[name.strip()] = val.strip()
+    r = http_get(url, headers=headers, timeout=timeout)
+    if r.error:
+        return None, None, r.error[:160]
+    return r.status, r.headers.get("Content-Security-Policy"), None  # _Headers: case-insensitive
 
 
 def main():
@@ -204,8 +200,6 @@ def main():
     ap.add_argument("--header", default=None, help="extra request header, e.g. 'Cookie: sess=...'")
     ap.add_argument("--timeout", type=int, default=15, help="per-request timeout (s)")
     args = ap.parse_args()
-
-    ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
 
     if args.policy is not None:
         raw_policy = args.policy
@@ -218,7 +212,7 @@ def main():
         target = args.url
         # CSP analysis is HEADER-ONLY: fetch_csp does a single urlopen of the
         # target URL and reads the Content-Security-Policy response header.
-        status, raw_policy, fetch_err = fetch_csp(args.url, args.header, ctx, args.timeout)
+        status, raw_policy, fetch_err = fetch_csp(args.url, args.header, args.timeout)
 
     directives = parse_csp(raw_policy)
     policy_present = bool(directives)

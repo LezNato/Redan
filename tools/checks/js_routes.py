@@ -10,12 +10,11 @@ every candidate (incl. unlinked/internal) for direct probing, post-filtered agai
 
 Usage: python js_routes.py <url> [--max-js N]
 """
-import sys, json, re, ssl, argparse, urllib.request
+import os, sys, json, re, argparse
 from urllib.parse import urljoin, urlparse
 from concurrent.futures import ThreadPoolExecutor
-
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
-_CTX = ssl.create_default_context(); _CTX.check_hostname = False; _CTX.verify_mode = ssl.CERT_NONE
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _http import get as http_get
 
 # callable-endpoint patterns
 FETCH_RE = re.compile(r"""(?:fetch|axios(?:\.(?:get|post|put|delete|patch))?|\\\$\.ajax|\.(?:get|post|put|delete|patch)\s*\(|XMLHttpRequest)[^"']{0,40}["']([~/][^"']{2,120})["']""", re.I)
@@ -25,11 +24,8 @@ GQL_OP_RE = re.compile(r"""(?:query|mutation)\s+([A-Za-z0-9_]+)\s*[({]""")
 STATIC_NOISE = re.compile(r"\.(?:png|jpg|jpeg|gif|svg|ico|css|woff2?|ttf|map|webp|mp4|webm)(?:\?|$)", re.I)
 
 def fetch(url, timeout=15):
-    try:
-        return urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"}),
-                                      timeout=timeout, context=_CTX).read().decode("utf-8", "replace")
-    except Exception:
-        return ""
+    r = http_get(url, timeout=timeout, max_body=5_000_000)
+    return "" if (r.error or r.status >= 400) else r.text
 
 def extract(blob):
     routes = set()

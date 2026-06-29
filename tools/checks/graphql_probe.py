@@ -10,24 +10,18 @@ Candidate findings/leads — the verifier confirms object-level access.
 Usage:
   python graphql_probe.py <base-url-or-graphql-url>
 """
-import sys, os, re, ssl, json, argparse, urllib.request, urllib.error
+import sys, os, re, json, argparse
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _http import post as http_post
 
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 PATHS = ["", "/graphql", "/api/graphql", "/v1/graphql", "/graphql/v1", "/query", "/graphiql", "/api/gql"]
 INTROSPECT = {"query": "query{__schema{queryType{name} mutationType{name} types{name kind fields{name}}}}"}
 SENSITIVE = re.compile(r"(?i)(password|passwd|secret|token|ssn|creditcard|credit_card|apikey|api_key|private|admin|role|isadmin)")
 
 def post(url, payload, timeout=15):
-    ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
-    data = json.dumps(payload).encode()
-    req = urllib.request.Request(url, data=data, headers={"User-Agent": UA, "Content-Type": "application/json"})
-    try:
-        r = urllib.request.urlopen(req, timeout=timeout, context=ctx)
-        return r.getcode(), r.read(500000).decode("utf-8", "replace")
-    except urllib.error.HTTPError as e:
-        return e.code, (e.read(20000).decode("utf-8", "replace") if hasattr(e, "read") else "")
-    except Exception:
-        return None, ""
+    r = http_post(url, data=json.dumps(payload).encode(),
+                  headers={"Content-Type": "application/json"}, max_body=500000, timeout=timeout)
+    return (None, "") if r.error else (r.status, r.text)
 
 def probe(target):
     target = target.replace("//localhost", "//127.0.0.1").rstrip("/")

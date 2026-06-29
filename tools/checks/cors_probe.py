@@ -12,21 +12,13 @@ origin AND a `null` origin.
 
 Usage: python cors_probe.py <url> [<url> ...]
 """
-import sys, json, ssl, argparse, urllib.request, urllib.error
-
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
-_CTX = ssl.create_default_context(); _CTX.check_hostname = False; _CTX.verify_mode = ssl.CERT_NONE
+import os, sys, json, argparse
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _http import get as http_get
 
 def _req(url, origin):
-    try:
-        r = urllib.request.urlopen(urllib.request.Request(
-            url, headers={"User-Agent": UA, "Origin": origin, "Accept": "application/json,text/html;q=0.9"}),
-            timeout=15, context=_CTX)
-        return r.status, {k.lower(): v for k, v in r.headers.items()}
-    except urllib.error.HTTPError as e:
-        return e.code, {k.lower(): v for k, v in (e.headers or {}).items()}
-    except Exception:
-        return None, {}
+    r = http_get(url, headers={"Origin": origin, "Accept": "application/json,text/html;q=0.9"}, timeout=15)
+    return (None, {}) if r.error else (r.status, r.headers)  # r.headers is lower-cased
 
 def check(url):
     findings = []

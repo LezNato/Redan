@@ -14,21 +14,14 @@ Usage:
   python wp_fingerprint.py <url>
   python wp_fingerprint.py --file path/to/homepage.html [--name target]
 """
-import sys, json, ssl, re, urllib.request, urllib.error, argparse
+import os, sys, json, re, argparse
 from collections import Counter
-
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _http import get as http_get
 
 def fetch(url, timeout=25):
-    ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "text/html,*/*"})
-    try:
-        return urllib.request.urlopen(req, timeout=timeout, context=ctx).read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as e:
-        try: return e.read().decode("utf-8", "replace")
-        except Exception: return ""
-    except Exception:
-        return ""
+    r = http_get(url, timeout=timeout, max_body=5_000_000)
+    return "" if r.error else r.text
 
 def fingerprint(html, target):
     is_wp = bool(re.search(r"/wp-(content|includes)/|wp-json", html))

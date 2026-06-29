@@ -14,22 +14,17 @@ Two modes:
 
 Usage: python cache_probe.py <url> [--deception] [--poison] [--marker <attacker-string>]
 """
-import sys, json, ssl, re, argparse, urllib.request, urllib.error
+import os, sys, json, re, argparse
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _http import get as http_get
 
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
-_CTX = ssl.create_default_context(); _CTX.check_hostname = False; _CTX.verify_mode = ssl.CERT_NONE
 CONFUSION = ["{p};.css", "{p}/x.css", "{p}%00.css", "{p};.png", "{p}/a/b.css"]
 UNKEYED_HEADERS = ["X-Forwarded-Host", "X-Original-URL", "X-Forwarded-Scheme", "X-Forwarded-Proto", "X-Rewrite-URL"]
 
 def _req(url, headers=None, verify=True):
-    h = {"User-Agent": UA, "Accept": "text/html,application/json;q=0.9"}; h.update(headers or {})
-    try:
-        r = urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=15, context=(_CTX if not verify else None))
-        return r.status, dict(r.headers), r.read(3000).decode("utf-8", "replace")
-    except urllib.error.HTTPError as e:
-        return e.code, dict(e.headers or {}), e.read(3000).decode("utf-8", "replace")
-    except Exception as e:
-        return None, {}, str(e)
+    h = {"Accept": "text/html,application/json;q=0.9"}; h.update(headers or {})
+    r = http_get(url, headers=h, verify=verify, max_body=3000, timeout=15)  # cache_probe verifies TLS by default
+    return (None, {}, str(r.error)) if r.error else (r.status, r.headers, r.text)
 
 def deception(base, marker, verify):
     # baseline: a known-nonexistent random path (the cache/SPA shell)

@@ -14,12 +14,13 @@ caller is responsible for scope.
 
 Usage: python path_probe.py <base-url> [--full]
 """
-import sys, os, json, ssl, hashlib, urllib.request, urllib.error, argparse
+import sys, os, json, hashlib, argparse
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _http import get as http_get
 from concurrent.futures import ThreadPoolExecutor
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _concurrency import workers
 
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 
 CORE = [
     ".git/HEAD", ".git/config", ".env", ".env.bak", "wp-config.php.bak", "config.php.bak",
@@ -39,18 +40,12 @@ SENSITIVE = {".git/HEAD", ".git/config", ".env", ".env.bak", "wp-config.php.bak"
              "id_rsa", ".aws/credentials", ".svn/entries", ".gitlab-ci.yml"}
 
 def get(url, timeout=12):
-    ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
-    req = urllib.request.Request(url, method="GET", headers={"User-Agent": UA})
-    try:
-        r = urllib.request.urlopen(req, timeout=timeout, context=ctx)
-        body = r.read(60000)
-        return r.getcode(), (r.headers.get("Content-Type") or "").split(";")[0].strip().lower(), body
-    except urllib.error.HTTPError as e:
-        try: body = e.read(60000)
-        except Exception: body = b""
-        return e.code, (e.headers.get("Content-Type") if e.headers else "") or "", body
-    except Exception:
+    r = http_get(url, timeout=timeout, max_body=60000)
+    if r.error:
         return None, None, b""
+    raw_ct = r.headers.get("Content-Type") or ""   # case-insensitive (_http _Headers)
+    ct = raw_ct.split(";")[0].strip().lower() if r.status < 400 else raw_ct  # match orig success/error asymmetry
+    return r.status, ct, r.body
 
 def sig(body):
     return hashlib.sha256(body or b"").hexdigest()[:16], len(body or b"")

@@ -93,6 +93,28 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/health":
             return self._json(200, {"ok": True})
 
+        # A header/content-rich, DETERMINISTIC page — exercises the header/GET probes
+        # (cors/clickjack/csp/sri/js_secrets/...) so a migration before/after diff is meaningful.
+        if path == "/rich":
+            origin = self.headers.get("Origin", "")
+            body = ("<!doctype html><html><head>"
+                    "<script src=\"https://cdn.example.net/lib.js\"></script>"
+                    "<script>var apiKey=\"AKIA_NOT_REAL_EXAMPLE\"; fetch('/api/v1/orders');</script>"
+                    "</head><body><a href=\"/dashboard\">d</a><form action=\"/submit\" method=post>"
+                    "<input name=q></form></body></html>")
+            extra = {
+                "X-Frame-Options": "SAMEORIGIN",
+                "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'",
+                "Strict-Transport-Security": "max-age=31536000",
+                "X-Content-Type-Options": "nosniff",
+                "Server": "nginx/1.25.0", "X-Powered-By": "PHP/8.2.0",
+                "Set-Cookie": "sid=abc; Path=/",
+                "Cache-Control": "public, max-age=60",
+                "Access-Control-Allow-Origin": origin or "*",
+                "Access-Control-Allow-Credentials": "true",
+            }
+            return self._send(200, body, extra=extra)
+
         # BENIGN reflector — echoes input verbatim (false-positive bait for
         # cmd_inject / xss_scan / ssti_probe). Real attacker input is reflected
         # but NEVER executed.

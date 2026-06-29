@@ -10,13 +10,12 @@ Discovery/leads — the verifier confirms. Core-scaled fetches.
 Usage:
   python js_secrets.py <url> [--max-files 15] [--concurrency N]
 """
-import sys, os, re, ssl, json, argparse, urllib.request, urllib.error
+import sys, os, re, json, argparse
 from urllib.parse import urljoin, urlparse
 from concurrent.futures import ThreadPoolExecutor
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _concurrency import workers
-
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+from _http import get as http_get
 
 # (label, severity, regex) — vendor/assignment patterns are high-confidence
 PATTERNS = [
@@ -38,12 +37,8 @@ PATTERNS = [
 ]
 
 def fetch(url, timeout=20, limit=2_000_000):
-    ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
-    try:
-        return urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": UA}),
-                                      timeout=timeout, context=ctx).read(limit).decode("utf-8", "replace")
-    except Exception:
-        return ""
+    r = http_get(url, timeout=timeout, max_body=limit)
+    return "" if (r.error or r.status >= 400) else r.text
 
 def mask(s):
     s = s.strip().strip("'\"")
