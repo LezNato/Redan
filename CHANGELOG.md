@@ -4,6 +4,23 @@ All notable changes to Redan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/). Versions are git-tagged (`vX.Y.Z`).
 
+## [0.3.2] — 2026-06-30
+
+*Guards so the v0.3.1 bug class can't recur — a missing test let it ship.* No
+interface change.
+
+### Added
+- **`tests/test_render.py`** — the report pipeline had **no** render test, which is
+  how the v0.3.0 chokepoint regression shipped unnoticed. Pins the behavior:
+  clean→render, advisory-PII→render, secret→refuse (exit 4), legacy/blank
+  `evidence_index` row→`finding_schema` error.
+- **`doctrine_lint.py` C10** — a render/export redaction **refuse** (`sys.exit(4)`)
+  must key off categorized `secret_hits` (`redact.scan`/`scan_file`), never
+  `redact_text`'s total count (which includes advisory PII). Regression-locks the
+  v0.3.1 render fix across consumers; tested to fire on the old pattern.
+- **CONTRIBUTING** — a "Changing a shared primitive" section: grep + update the
+  consumers in lockstep, gate on categories not totals, add a test at the seam.
+
 ## [0.3.1] — 2026-06-30
 
 *Two bugfixes surfaced while re-verifying a live engagement deliverable.* Patch —
@@ -85,6 +102,7 @@ modules** (68 → 72).
 chain-exploitation layer, independent verification, and a QA-gated single-source
 reporting pipeline. Proven on real engagements.
 
+[0.3.2]: https://github.com/LezNato/Redan/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/LezNato/Redan/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/LezNato/Redan/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/LezNato/Redan/compare/v0.1.0...v0.2.0

@@ -27,9 +27,21 @@ Contributions are welcome. A few guidelines:
 5. Add a test to `tests/`: a true-positive AND a false-positive-rejection against a
    `tests/lab_server.py` endpoint (a detector without both halves isn't proven).
 
+## Changing a shared primitive (`redact` / `_http` / `_result` / the report pipeline)
+When you change something **other code depends on**, the bug usually lands in a *consumer*
+that wasn't updated in lockstep, not in the thing you changed. So:
+1. **Grep for the consumers and update them in the same change.** (e.g. hardening `redact`
+   to detect PII broke `render_report.py`, which refused-to-render on *any* redact hit
+   instead of secret-only — `export.py`, the other consumer, was already correct.)
+2. **Use the primitive's categories, not its totals, for a gate.** A refuse/BLOCK keys off
+   `redact.scan` `secret_hits`, never `redact_text`'s combined count. **(doctrine_lint C10.)**
+3. **Add/extend a test AT THE SEAM** — the behavior the consumer relies on (e.g.
+   `tests/test_render.py`: secret→refuse, advisory-PII→render). An un-tested chokepoint is
+   how a regression ships silently.
+
 ## Testing
 - Run **`python tests/run_all.py`** before committing — it runs the doctrine self-audit
-  (`doctrine_lint.py` C1–C9) + every `tests/test_*.py`. This is what CI gates
+  (`doctrine_lint.py` C1–C10) + every `tests/test_*.py`. This is what CI gates
   ([`.github/workflows/tests.yml`](.github/workflows/tests.yml)).
 - `redact.py scan` (no credential leaks) and the import/compile smoke run inside it.
 - Stage specific files, never `git add -A`.

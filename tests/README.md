@@ -32,7 +32,7 @@ CI: `.github/workflows/tests.yml` runs `run_all.py` on every push/PR.
 
 ## The doctrine linter
 
-`tools/checks/doctrine_lint.py` is a deterministic self-audit (C1–C9): no
+`tools/checks/doctrine_lint.py` is a deterministic self-audit (C1–C10): no
 single-signal `CONFIRMED` verdicts (C1), redaction coverage of the QA-gate classes
 (C2), resolvable rule cross-refs (C3), tool refs exist (C4), valid agent models
 (C5), schema completeness (C6), **the repo passes its own `redact` scan** (C7),

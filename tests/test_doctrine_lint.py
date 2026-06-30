@@ -48,6 +48,21 @@ def main():
                        '    verdict = "SQLI LEAD — boolean signal"\n    return verdict, note\n')
     rec("ignores mid-sentence note + LEAD verdict", len(doctrine_lint.c1_no_hard_confirmed([clean])) == 0)
 
+    # (e) C10 CATCHES a render/export that refuses on redact_text TOTAL (incl. advisory PII)
+    rr_bad = tempfile.mkdtemp()
+    with open(os.path.join(rr_bad, "render_x.py"), "w", encoding="utf-8") as f:
+        f.write("from redact import redact_text\n"
+                "_, hits = redact_text(open('f').read())\n"
+                "if hits:\n    print('REFUSING'); sys.exit(4)\n")
+    rec("C10 catches refuse-on-redact_text-total", len(doctrine_lint.c10_redaction_refuse_categorized(rr_bad)) == 1)
+
+    # (f) C10 does NOT flag a refuse keyed off categorized secret hits
+    rr_ok = tempfile.mkdtemp()
+    with open(os.path.join(rr_ok, "render_y.py"), "w", encoding="utf-8") as f:
+        f.write("from redact import redact_text, scan_file\n"
+                "if [h for h in scan_file('f') if h['category']=='secret']:\n    sys.exit(4)\n")
+    rec("C10 ignores categorized-secret refuse", len(doctrine_lint.c10_redaction_refuse_categorized(rr_ok)) == 0)
+
     npass = sum(CHECKS)
     print(f"\n{npass}/{len(CHECKS)} checks passed")
     sys.exit(0 if npass == len(CHECKS) else 1)

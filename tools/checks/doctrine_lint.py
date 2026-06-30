@@ -21,6 +21,9 @@ Checks:
   C7  the repo passes its own redact scan (no unallowlisted secret on the committed surface).
   C8  tool doc-code drift — every tools/checks/*.py is documented in its README, and vice-versa.
   C9  the stated '<N> stdlib modules' count in CLAUDE.md / README.md matches reality.
+  C10 a render/export redaction REFUSE (sys.exit 4) keys off categorized secret_hits
+      (redact.scan/scan_file), never redact_text's TOTAL count — which now includes
+      advisory PII and would wrongly block a report carrying a contact address.
 
 Usage: python tools/checks/doctrine_lint.py            # exit 1 on any violation
 """
@@ -234,6 +237,31 @@ def c9_module_count():
     return bad
 
 
+def c10_redaction_refuse_categorized(rr_dir=None):
+    """A render/export REFUSE on redaction (sys.exit(4)) must key off CATEGORIZED
+    secret hits (redact.scan/scan_file -> secret_hits), never redact_text's TOTAL
+    hit count -- which now includes ADVISORY PII (emails) and would wrongly refuse
+    to render/export a report carrying a contact/remediation address (the v0.3.1
+    regression; the qa-gate calls PII advisory). When a shared primitive is hardened
+    (redact gained PII detection), its consumers must use its CATEGORIES, not its
+    total. (render_report.py / export.py.)"""
+    rr = rr_dir if rr_dir is not None else os.path.join(REPO, "tools", "report-render")
+    violations = []
+    for f in sorted(os.listdir(rr)):
+        if not f.endswith(".py"):
+            continue
+        src = open(os.path.join(rr, f), encoding="utf-8").read()
+        imports_redact = re.search(r"\bfrom redact import\b|\bimport redact\b", src)
+        if not (imports_redact and "sys.exit(4)" in src):
+            continue
+        if not re.search(r"secret_hits|scan_file|\bscan\(", src):
+            violations.append(
+                f"tools/report-render/{f} refuses (sys.exit(4)) on a redaction check but does "
+                f"not use categorized secret hits (redact.scan/scan_file -> secret_hits) -- it "
+                f"likely refuses on redact_text's TOTAL count, incl. advisory PII (v0.3.1 class)")
+    return violations
+
+
 CHECK_FNS = [
     ("C1 no-hard-CONFIRMED verdicts", c1_no_hard_confirmed),
     ("C2 redact covers QA-gate classes", c2_redact_coverage),
@@ -244,6 +272,7 @@ CHECK_FNS = [
     ("C7 repo passes its own redact scan", c7_repo_passes_redact),
     ("C8 tool doc-code drift", c8_tool_doc_drift),
     ("C9 stated module count is accurate", c9_module_count),
+    ("C10 redaction refuse uses categorized secret hits", c10_redaction_refuse_categorized),
 ]
 
 
