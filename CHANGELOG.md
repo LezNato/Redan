@@ -4,6 +4,23 @@ All notable changes to Redan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/). Versions are git-tagged (`vX.Y.Z`).
 
+## [0.3.1] — 2026-06-30
+
+*Two bugfixes surfaced while re-verifying a live engagement deliverable.* Patch —
+no interface change.
+
+### Fixed
+- **`render_report.py`** — v0.3.0 taught `redact_text` to detect PII (emails), but
+  the render chokepoint refused-to-render on **any** `redact_text` hit — so it
+  blocked on an advisory contact/remediation address and made pre-v0.3.0 reports
+  un-renderable, contradicting the qa-gate's "PII is advisory" policy. Now refuses
+  on **secret (credential) hits only**; PII is a note and is still neutralized when
+  embedded into `report.html`.
+- **`finding_schema.py`** — reject `evidence_index` rows missing `file` (e.g. legacy
+  `path`/`desc` keys), which render as **blank appendix rows** and drop the
+  artifact's embed/caption linkage. Was a human-lens-only catch (a QA-gate BLOCK);
+  now deterministic.
+
 ## [0.3.0] — 2026-06-30
 
 *False-positive discipline: kill confident-but-wrong findings, self-enforce the
@@ -68,6 +85,7 @@ modules** (68 → 72).
 chain-exploitation layer, independent verification, and a QA-gated single-source
 reporting pipeline. Proven on real engagements.
 
+[0.3.1]: https://github.com/LezNato/Redan/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/LezNato/Redan/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/LezNato/Redan/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/LezNato/Redan/releases/tag/v0.1.0
