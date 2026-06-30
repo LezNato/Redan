@@ -4,6 +4,22 @@ All notable changes to Redan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/). Versions are git-tagged (`vX.Y.Z`).
 
+## [0.4.0] — 2026-06-30
+
+*Finding lifecycle / retest — the first enterprise-program layer.* New capability,
+backward-compatible (a new tool; nothing else changes).
+
+### Added
+- **`finding_ledger.py`** — cross-engagement finding lifecycle + retest. Each finding
+  gets a STABLE `finding_uid` (fingerprint = `target | CWE | normalized-location`, with
+  ids templated out so `/api/orders/1002` ≡ `/api/orders/{id}`) — so the same bug is
+  tracked across runs even when the proving object id and the title change. `record`
+  upserts an engagement into a gitignored cross-engagement ledger; `retest` diffs a new
+  run against it and emits the delta **fixed / still-open / new / regressed**; `status`
+  shows the portfolio. Turns one-shot assessments into a security *program*.
+  (`tests/test_finding_ledger.py` covers uid-stability + all four retest paths.)
+- **73 stdlib modules** (was 72).
+
 ## [0.3.3] — 2026-06-30
 
 *Edge-channel routing fixes surfaced by a live re-test against a graylisting target.*
@@ -121,6 +137,7 @@ modules** (68 → 72).
 chain-exploitation layer, independent verification, and a QA-gated single-source
 reporting pipeline. Proven on real engagements.
 
+[0.4.0]: https://github.com/LezNato/Redan/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/LezNato/Redan/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/LezNato/Redan/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/LezNato/Redan/compare/v0.3.0...v0.3.1

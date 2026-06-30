@@ -125,7 +125,7 @@ pipeline → hard limits → bar:
 
 ## Current state
 
-A comprehensive web-only black-box pentest ensemble: **72 stdlib modules**, **8 agents**, a
+A comprehensive web-only black-box pentest ensemble: **73 stdlib modules**, **8 agents**, a
 **chain-exploitation layer**, edge-egress rotation (proxy + browser channel for
 WAF'd/graylisted targets), independent verification, and a QA-gated single-source
 reporting pipeline. Proven on real engagements (including a WAF'd WordPress site and a React/ASP.NET SPA) +
@@ -135,7 +135,7 @@ oracle, plus import/compile smoke across all modules) and a deterministic **doct
 self-audit** (`tools/checks/doctrine_lint.py`) gate the kit in CI
 (`.github/workflows/tests.yml`) against drift from its own discipline.
 
-### Tooling (`tools/checks/` (72 stdlib modules) + `tools/report-render/`)
+### Tooling (`tools/checks/` (73 stdlib modules) + `tools/report-render/`)
 **Recon**: `http_headers`, `tls_check`, `dns_email` (+CAA/DNSSEC), `wp_fingerprint`, `path_probe`,
 `port_scan`, `recon_sweep` (concurrent), `host_intel` (Shodan passive), `wayback_recon` (CDX), `subdomain_enum` (subfinder-style multi-source passive + wordlist brute), `proxy_rotate` (free-proxy egress rotation when an edge graylists your IP),
 `waf_detect` (JS-challenge routing), `origin_discover`, `multi_target`, `health_check` (prod safety),
@@ -156,7 +156,7 @@ reflection/context) + `xss_payloads` (OOB-exfil proof),
 `oauth_probe` (OAuth grant-flow misconfig), `openapi_probe` (spec-driven API fuzzing).
 **Authenticated testing** (read-only default, E2E-validated): `auth_login` (form/json/token),
 `auth_request` (IDOR canary 4-cell + funclevel + massassign), `_authlib`, `oob.py` (collaborator).
-**Integrity/reporting**: `redact` (credential **+ PII** redactor; secret hits BLOCK, PII advisory unless `--strict`; scans every non-binary file incl. `.env`/`.pem`), `finding_schema` (dangling-evidence + `derived_from` chain-provenance), `replay` (raw-HTTP transcript replay + response-diff — verifier exact-byte reproduction of browser-channel/complex flows; stale-credential-aware), `render_report`
+**Integrity/reporting**: `redact` (credential **+ PII** redactor; secret hits BLOCK, PII advisory unless `--strict`; scans every non-binary file incl. `.env`/`.pem`), `finding_schema` (dangling-evidence + `derived_from` chain-provenance + blank/legacy `evidence_index`-row catch), `finding_ledger` (**cross-engagement lifecycle/retest** — stable `finding_uid` fingerprint → fixed/still-open/new/regressed delta; the security-program layer), `replay` (raw-HTTP transcript replay + response-diff — verifier exact-byte reproduction of browser-channel/complex flows; stale-credential-aware), `render_report`
 (standalone HTML + logo; renders chain `derived_from`), `export` (SARIF/Jira/DefectDojo — canonical `description`/`reproduction`, redaction via `redact`), `doctrine_lint` (deterministic self-audit of the kit's adherence to `.claude/rules/` — C1–C10), `run_manifest` (append-only per-engagement audit trail — wrap/record/show), `_http` (shared HTTP client — single UA/TLS/proxy chokepoint), `_result` (canonical tool-output contract + validator), `_concurrency`, `_stealth` (UA pool + jitter + proxy — wired via `_http`), `_result_cache` (TTL result cache — wired into `cve_lookup` for idempotent OSV lookups).
 
 ### Agents (8)
