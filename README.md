@@ -42,7 +42,7 @@ findings.
 ## Prerequisites
 
 - **[Claude Code](https://docs.claude.com/en/docs/claude-code/overview)** (the CLI).
-- **Python 3.10+** — the 73 tools are stdlib Python.
+- **Python 3.10+** — the 74 tools are stdlib Python.
 - **Playwright** *(only for the browser-channel agents + `browser_probe.py`; the stdlib tools run without it)*:
   ```sh
   pip install playwright && playwright install chromium
