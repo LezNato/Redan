@@ -224,16 +224,27 @@ def c8_tool_doc_drift():
     return violations
 
 
+# A count claim, anchored on the tool/module NOUN so odd wording can't slip a stale
+# number past the gate: "<N> stdlib modules", "<N> deterministic tools", "<N>-tool
+# catalog", "the <N>\ntools" — hyphen, line-break, and a stdlib/deterministic
+# qualifier are all tolerated. (Real drift this caught that the bare "<N> stdlib
+# modules" matcher missed: README "73 deterministic tools" + "the 73-tool catalog".)
+_COUNT_CLAIM = re.compile(
+    r"(\d+)[ \t\r\n-]+(?:stdlib |deterministic |stdlib-only )*(?:module|tool)s?\b", re.I)
+
+
 def c9_module_count():
-    """A stated '<N> stdlib modules' count in CLAUDE.md / README.md matches reality
-    (the count drift that had to be fixed by hand — now mechanical)."""
+    """Every <N>-tools / <N>-modules count claim in CLAUDE.md / README.md matches the
+    real tools/checks/ file count — the count drift once fixed by hand, now mechanical
+    AND phrasing-agnostic (anchored on the noun, not one literal phrasing)."""
     actual = len([f for f in os.listdir(CHECKS) if f.endswith(".py")])
     bad = []
     for doc in ("CLAUDE.md", "README.md"):
         text = open(os.path.join(REPO, doc), encoding="utf-8").read()
-        for n in re.findall(r"(\d+) stdlib modules", text):
-            if int(n) != actual:
-                bad.append(f"{doc} says '{n} stdlib modules' but tools/checks/ has {actual}")
+        for m in _COUNT_CLAIM.finditer(text):
+            if int(m.group(1)) != actual:
+                phrase = re.sub(r"\s+", " ", m.group(0)).strip()
+                bad.append(f"{doc} says '{phrase}' but tools/checks/ has {actual}")
     return bad
 
 

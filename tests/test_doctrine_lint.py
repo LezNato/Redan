@@ -63,6 +63,19 @@ def main():
                 "if [h for h in scan_file('f') if h['category']=='secret']:\n    sys.exit(4)\n")
     rec("C10 ignores categorized-secret refuse", len(doctrine_lint.c10_redaction_refuse_categorized(rr_ok)) == 0)
 
+    # (g) C9 count-claim matcher is phrasing-agnostic — catches "<N> deterministic
+    #     tools" / "<N>-tool catalog" / line-split, without false-positiving on
+    #     adjacent "<N> <noun>" prose (the README:23/130 drift that bare-phrase missed).
+    cc = doctrine_lint._COUNT_CLAIM
+    pos = ["75 stdlib modules", "73 deterministic tools", "the 73-tool catalog",
+           "the 75\ntools are stdlib", "75-tool catalog"]
+    neg = ["8 agents", "5 skills", "OWASP Top 10", "API Top 10", "Python 3.10+",
+           "NIST SP 800-115", "2 render tools", "4-cell IDOR", "7-source passive"]
+    rec("C9 regex catches all count phrasings", all(cc.search(s) for s in pos),
+        str([s for s in pos if not cc.search(s)]))
+    rec("C9 regex ignores non-count <N> <noun> prose", not any(cc.search(s) for s in neg),
+        str([s for s in neg if cc.search(s)]))
+
     npass = sum(CHECKS)
     print(f"\n{npass}/{len(CHECKS)} checks passed")
     sys.exit(0 if npass == len(CHECKS) else 1)
