@@ -4,6 +4,25 @@ All notable changes to Redan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/). Versions are git-tagged (`vX.Y.Z`).
 
+## [0.3.3] — 2026-06-30
+
+*Edge-channel routing fixes surfaced by a live re-test against a graylisting target.*
+No interface change (the `--proxy` list is backward-compatible with a single value).
+
+### Fixed
+- **`waf_detect.py`** — a target that returned **no HTTP response on any probe**
+  (timeout/SYN-drop) was misclassified `clean-or-passive` / "reach directly". It was
+  actually **per-IP graylisting** the tester — concluding "clean" is a false negative
+  that sends you at a wall. The decision is now a pure, unit-tested `classify()` with a
+  first-class **`unreachable-or-graylisted`** posture that routes to a fresh egress
+  (`proxy_rotate.py`) + the browser channel. (`tests/test_waf_detect.py`.)
+
+### Changed
+- **`browser_probe.py` `--proxy`** now accepts a **comma-separated proxy list and fails
+  over** — a `proxy_rotate` hit means the proxy reached the edge, not that it can solve
+  the PoW in a browser (free proxies are ephemeral). Pass several; it tries each until one
+  clears the challenge. Single-value `--proxy` is unchanged.
+
 ## [0.3.2] — 2026-06-30
 
 *Guards so the v0.3.1 bug class can't recur — a missing test let it ship.* No
@@ -102,6 +121,7 @@ modules** (68 → 72).
 chain-exploitation layer, independent verification, and a QA-gated single-source
 reporting pipeline. Proven on real engagements.
 
+[0.3.3]: https://github.com/LezNato/Redan/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/LezNato/Redan/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/LezNato/Redan/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/LezNato/Redan/compare/v0.2.0...v0.3.0

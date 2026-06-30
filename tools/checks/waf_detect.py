@@ -39,6 +39,32 @@ def looks_challenge(body):
     low = (body or "").lower()
     return next((s for s in CHALLENGE if s in low), None)
 
+def classify(all_none, js_challenge, xhr_blocked, waf, nav_s):
+    """Pure posture/channel decision (unit-tested). Order matters: the NO-RESPONSE
+    case must be caught FIRST — three null statuses mean the host never answered
+    (timeout/SYN-drop), which is most often a per-IP graylist (Imunify360-class drops
+    a returning tester's IP), NOT a clean target. Concluding 'reach directly' there is
+    a false negative that sends the tester at a wall (the bug this fixes)."""
+    if all_none:
+        return ("unreachable-or-graylisted",
+                "NO HTTP RESPONSE on any probe (timeout/SYN-drop) — most likely a per-IP graylist "
+                "(Imunify360-class), or the host is down. urllib/curl are BLIND here; a 'clean' verdict "
+                "would be a FALSE NEGATIVE. Get a fresh egress (proxy_rotate.py) and route the BROWSER "
+                "channel through it (browser_probe.py --proxy); if it still fails, verify the host is up.")
+    if js_challenge:
+        return ("js-challenge",
+                "BROWSER REQUIRED — route active testing via the browser agents (web-tester/verifier); "
+                "urllib/curl tools will be blocked and emit false positives")
+    if xhr_blocked and nav_s and nav_s < 400:
+        return ("xhr-blocked-waf",
+                "deterministic tools work for navigations; XHR/fetch-style probes are blocked (415/403) — "
+                "prefer navigation-style requests")
+    if waf and nav_s and nav_s < 400:
+        return ("waf-present-passive",
+                "WAF present but not actively challenging — deterministic tools should work; "
+                "watch for rate-limit re-challenge")
+    return ("clean-or-passive", "no JS challenge detected — deterministic tools should reach the app directly")
+
 def detect(url):
     url = url.rstrip("/")
     nav_s, nav_h, nav_b = get(url + "/", NAV)
@@ -51,23 +77,17 @@ def detect(url):
     lens = [len(b or "") for b in (nav_b, xhr_b, miss_b)]
     uniform = max(lens) - min(lens) <= max(40, int(min(lens) * 0.05)) if min(lens) else False
     xhr_blocked = xhr_s in (403, 406, 415)
+    all_none = nav_s is None and xhr_s is None and miss_s is None
     js_challenge = bool(challenge_sig) or (uniform and nav_s == 200 and miss_s == 200)
-
-    if js_challenge:
-        posture = "js-challenge"
-        channel = "BROWSER REQUIRED — route active testing via the browser agents (web-tester/verifier); urllib/curl tools will be blocked and emit false positives"
-    elif xhr_blocked and nav_s and nav_s < 400:
-        posture = "xhr-blocked-waf"
-        channel = "deterministic tools work for navigations; XHR/fetch-style probes are blocked (415/403) — prefer navigation-style requests"
-    elif waf and nav_s and nav_s < 400:
-        posture = "waf-present-passive"
-        channel = "WAF present but not actively challenging — deterministic tools should work; watch for rate-limit re-challenge"
-    else:
-        posture = "clean-or-passive"
-        channel = "no JS challenge detected — deterministic tools should reach the app directly"
+    posture, channel = classify(all_none, js_challenge, xhr_blocked, waf, nav_s)
 
     findings = []
-    if js_challenge:
+    if posture == "unreachable-or-graylisted":
+        findings.append({"id": "edge-no-response", "severity": "info",
+                         "detail": "No HTTP response on the nav/xhr/missing probes (timeout/SYN-drop) — "
+                                   "likely a per-IP graylist (Imunify360-class) or the host is down. "
+                                   "Fresh egress (proxy_rotate.py) + browser channel required; do NOT treat as clean."})
+    elif js_challenge:
         findings.append({"id": "edge-js-challenge", "severity": "info",
                          "detail": f"JS proof-of-work challenge at the edge ({waf or 'unknown WAF'}"
                                    + (f", sig '{challenge_sig}'" if challenge_sig else "")

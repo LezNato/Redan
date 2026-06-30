@@ -168,14 +168,21 @@ actually reaches the app:
   residential proxy is the realistic attacker egress for that path.)
 - **Kit egress tooling (no Tor/provisioned proxy?).** `proxy_rotate.py <target>` sources
   free public HTTP proxies (TheSpeedX/PROXY-List, ProxyScrape), tests them in parallel, and
-  returns ones that reach the target's edge; pass one to `browser_probe.py --proxy http://ip:port`
-  (or any Playwright `proxy={"server":...}`). The proxy beats the graylist; the browser beats
-  the PoW. **RoE: free proxies are unknown operators — recon only, never route
-  credentials/tokens/PII through them.**
+  returns ones that reach the target's edge; pass them to `browser_probe.py --proxy
+  ip1:port,ip2:port,...` (a **comma-separated list** — it fails over to the next when one
+  can't clear the PoW). The proxy beats the graylist; the browser beats the PoW. **A
+  proxy_rotate "hit" (`challenge:true`) means the proxy reached the edge, NOT that it can
+  solve the PoW in a browser — free proxies are ephemeral, so pass several and let
+  browser_probe fail over.** **RoE: free proxies are unknown operators — recon only, never
+  route credentials/tokens/PII through them.**
 
-`waf_detect.py` routes the channel FIRST; on `js-challenge`, do not trust non-browser
-results. `browser_probe.py` is the deterministic browser-channel tool (DOM/forms/network/
-headers/screenshot in a real headless Chromium) — re-run it on every urllib-blind positive.
+`waf_detect.py` routes the channel FIRST. On `js-challenge`, do not trust non-browser
+results. On **`unreachable-or-graylisted`** (no HTTP response on any probe — timeout/SYN-drop)
+the target is almost certainly per-IP-graylisting your egress (NOT clean — a "clean" verdict
+there is a false negative); get a fresh egress (`proxy_rotate.py`) + the browser channel
+before concluding anything. `browser_probe.py` is the deterministic browser-channel tool
+(DOM/forms/network/headers/screenshot in a real headless Chromium) — re-run it on every
+urllib-blind positive.
 
 ## The black-box ceiling
 
