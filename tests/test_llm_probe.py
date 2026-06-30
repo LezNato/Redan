@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 """test_llm_probe.py — TP + FP-rejection for the agnostic AI/LLM surface probe.
 
-  * vulnerable LLM (/api/chat): MUST lead — prompt-injection + system-prompt-leak.
-  * defended LLM (/api/chat-defended): detected as an LLM but the injection + leak
-    signals MUST NOT fire (the injection/leak false-positive bait).
+  * vulnerable LLM (/api/chat): MUST lead — prompt-injection (battery), a Base64
+    filter-bypass variant, system-prompt-leak, and (with --oob) tool-abuse.
+  * defended LLM (/api/chat-defended): detected as an LLM but the injection / leak
+    / tool-abuse signals MUST NOT fire (the false-positive bait).
   * benign non-LLM (/api/llm-safe): MUST NOT be detected as an LLM at all
     (reflection cannot forge the computed 13*13 marker).
-  * MCP server (/mcp): MUST lead — unauthenticated tools/list exposure.
+  * MCP server (/mcp): MUST lead — unauthenticated tools/list exposure AND a
+    poisoned tool description.
 
 Self-contained: starts the local lab, runs the real CLI as a subprocess.
 """
@@ -49,22 +51,29 @@ def ep(out, suffix):
 def main():
     srv, base = start_lab()
     try:
-        # --- vulnerable LLM: injection + leak true positives ---
-        tp = run(base, "--path", "/api/chat")
+        # --- vulnerable LLM: injection (battery + encoded bypass) + leak ---
+        tp = run(base, "--path", "/api/chat", "--no-mcp")
         rec("llm_probe TP: lead on vulnerable LLM", tp.get("disposition") == "lead", tp.get("disposition"))
         v = ep(tp, "/api/chat")
         rec("llm_probe TP: LLM detected (computed 13*13 marker)", v.get("llm_detected") is True)
         rec("llm_probe TP: prompt-injection signal (REDAN+17*17)", v.get("prompt_injection") is True)
+        rec("llm_probe TP: Base64 filter-bypass variant fires", bool(v.get("injection_filter_bypass")),
+            str(v.get("injection_filter_bypass")))
         rec("llm_probe TP: system-prompt-leak signal", v.get("system_prompt_leak") is True)
 
-        # --- defended LLM: detected, but injection + leak FP-rejected ---
-        df = run(base, "--path", "/api/chat-defended", "--no-mcp")
+        # --- vulnerable LLM with --oob: tool-abuse / excessive-agency callback ---
+        ab = run(base, "--path", "/api/chat", "--no-mcp", "--oob", "--oob-host", "127.0.0.1")
+        rec("llm_probe TP: tool-abuse OOB callback (excessive agency)",
+            ep(ab, "/api/chat").get("tool_abuse") is True, str(ep(ab, "/api/chat").get("tool_abuse")))
+
+        # --- defended LLM: detected, but injection + leak + tool-abuse FP-rejected ---
+        df = run(base, "--path", "/api/chat-defended", "--no-mcp", "--oob", "--oob-host", "127.0.0.1")
         d = ep(df, "/api/chat-defended")
         rec("llm_probe: defended LLM still detected", d.get("llm_detected") is True)
         rec("llm_probe FP-reject: defended LLM is NOT injectable",
             d.get("prompt_injection") is False, str(d.get("prompt_injection")))
-        rec("llm_probe FP-reject: defended LLM does NOT leak",
-            d.get("system_prompt_leak") is False)
+        rec("llm_probe FP-reject: defended LLM does NOT leak", d.get("system_prompt_leak") is False)
+        rec("llm_probe FP-reject: defended LLM does NOT abuse tools", d.get("tool_abuse") is False)
         rec("llm_probe FP-reject: detected-but-defended LLM is no lead",
             df.get("disposition") == "none", df.get("disposition"))
 
@@ -74,13 +83,14 @@ def main():
             ep(fp, "/api/llm-safe").get("llm_detected") in (False, None) and
             fp.get("disposition") == "none", fp.get("disposition"))
 
-        # --- MCP: unauthenticated tools/list exposure is a lead ---
+        # --- MCP: unauthenticated tools/list exposure + tool-description poisoning ---
         mc = run(base, "--path", "/mcp")
-        rec("llm_probe TP: lead on MCP tools exposure", mc.get("disposition") == "lead", mc.get("disposition"))
+        rec("llm_probe TP: lead on MCP exposure", mc.get("disposition") == "lead", mc.get("disposition"))
         rec("llm_probe TP: MCP tools exposed", ep(mc, "/mcp").get("mcp_tools_exposed") is True)
+        rec("llm_probe TP: MCP tool-poisoning detected", ep(mc, "/mcp").get("mcp_tool_poisoning") is True)
 
         # --- discovery (no --path) finds the vulnerable LLM by agnostic path list ---
-        dz = run(base)
+        dz = run(base, "--no-mcp")
         rec("llm_probe discovery: finds /api/chat + leads", dz.get("disposition") == "lead" and
             ep(dz, "/api/chat").get("llm_detected") is True, dz.get("disposition"))
     finally:

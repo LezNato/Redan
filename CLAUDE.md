@@ -157,7 +157,7 @@ reflection/context) + `xss_payloads` (OOB-exfil proof),
 `browser_probe` (Playwright SPA/WAF channel), `lfi_probe` (file inclusion / source disclosure),
 `ssrf_probe` (SSRF ladder via OOB), `csp_probe` (CSP bypass analysis), `csrf_probe` (CSRF enforcement),
 `oauth_probe` (OAuth grant-flow misconfig), `openapi_probe` (spec-driven API fuzzing),
-`llm_probe` (agnostic AI/LLM surface — endpoint/MCP discovery + prompt-injection/system-prompt-leak via a computed marker).
+`llm_probe` (agnostic AI/LLM surface — endpoint/MCP discovery + a computed-marker injection **battery** with encoded **filter-bypass**, **tool-abuse/excessive-agency** via OOB callback, system-prompt-leak, and MCP **tool-poisoning**).
 **Authenticated testing** (read-only default, E2E-validated): `auth_login` (form/json/token),
 `auth_request` (IDOR canary 4-cell + funclevel + massassign), `_authlib`, `oob.py` (collaborator).
 **Integrity/reporting**: `redact` (credential **+ PII** redactor; secret hits BLOCK, PII advisory unless `--strict`; scans every non-binary file incl. `.env`/`.pem`), `finding_schema` (dangling-evidence + `derived_from` chain-provenance + blank/legacy `evidence_index`-row catch), `finding_ledger` (**cross-engagement lifecycle/retest** — stable `finding_uid` fingerprint → fixed/still-open/new/regressed delta; the security-program layer), `replay` (raw-HTTP transcript replay + response-diff — verifier exact-byte reproduction of browser-channel/complex flows; stale-credential-aware), `render_report`

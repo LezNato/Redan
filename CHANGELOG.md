@@ -4,6 +4,37 @@ All notable changes to Redan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/). Versions are git-tagged (`vX.Y.Z`).
 
+## [0.6.0] — 2026-06-30
+
+*`llm_probe` depth — black-box AI/LLM attack techniques.* Enhances an existing tool;
+backward-compatible (still **74 stdlib modules**). Stays **web-app only** — the AI
+features *of* the web app.
+
+### Added
+- **`llm_probe.py` deepened** with black-box techniques surfaced by a landscape scan
+  (garak / PyRIT / promptfoo / Cisco mcp-scanner), each keeping the computed-marker
+  LEAD discipline (`REDAN`+`17*17`, un-forgeable by a reflector):
+  - **Prompt-injection battery** — several override framings (not one), stop-on-first.
+  - **Filter-bypass** — the override Base64/reversed-encoded; firing past a guardrail
+    that blocks the plain form = an input-filter bypass (OWASP LLM01).
+  - **Tool-abuse / excessive agency** (`--oob`) — the model is told to fetch an OOB
+    collaborator URL (reuses `oob.py`); a callback proves the LLM has tool/network reach
+    and followed untrusted input = SSRF-via-the-app's-LLM (OWASP LLM06). The strongest
+    signal (a real outbound request); still a lead until internal reach is shown.
+  - **MCP tool-poisoning** — flags hidden instructions / exfil text inside an exposed
+    MCP tool's *description*, beyond bare `tools/list` exposure.
+  Honest ceilings stated (deferred): multi-turn / Crescendo + indirect/stored injection.
+- **`tests/test_llm_probe.py`** + lab endpoints extended — TP for every new signal
+  (Base64 bypass, OOB tool-abuse callback, MCP poisoning) AND FP-rejection (a defended
+  LLM is detected but none of injection/leak/tool-abuse fire). 16 checks.
+
+### Changed
+- Docs — `llm_probe` catalog/inventory/dispatch rows expanded; new **pitfalls.md** note
+  ("LLM tool-abuse callback ≠ confirmed SSRF" — a strong lead that still needs internal
+  reach). A landscape scan's out-of-lane suggestions (repo/secret OSINT, multi-engine
+  host search) were deliberately NOT built — perimeter/host recon, stated as coverage
+  gaps, not web-app testing.
+
 ## [0.5.0] — 2026-06-30
 
 *Agnostic AI/LLM web-surface probe.* New capability, backward-compatible (a new
@@ -205,6 +236,7 @@ modules** (68 → 72).
 chain-exploitation layer, independent verification, and a QA-gated single-source
 reporting pipeline. Proven on real engagements.
 
+[0.6.0]: https://github.com/LezNato/Redan/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/LezNato/Redan/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/LezNato/Redan/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/LezNato/Redan/compare/v0.4.0...v0.4.1

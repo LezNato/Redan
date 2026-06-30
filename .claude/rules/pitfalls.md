@@ -220,6 +220,15 @@ tools actually do (file/network/exec reach?) and whether they're invokable
 without auth, within RoE — don't rate an exposed read-only `ping` tool as a
 breach.
 
+**LLM tool-abuse callback ≠ confirmed SSRF.** `llm_probe --oob` getting a callback
+proves the app's LLM has tool/network reach and *followed untrusted input* to make
+an outbound request — real excessive agency (LLM06), the strongest of the LLM
+signals — but, exactly like the SSRF/OOB-callback pitfall above, a callback to an
+EXTERNAL collaborator is not yet reach to anything sensitive. **Confirm or kill:**
+demonstrate the LLM tool reaching an internal resource / cloud metadata
+(169.254.169.254) / a port it shouldn't — that internal reach is the confirmed
+SSRF; the external callback alone is a (strong) lead.
+
 ## Cross-references
 - `evidence-standard.md` — the disposition vocabulary and the confirmed bar.
 - `tradecraft-doctrine.md` — §1 (tag), §2 (test the right identity), §4 (banner ≠
