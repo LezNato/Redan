@@ -141,9 +141,19 @@ def cmd_retest(args):
     def brief(uids):
         return [{"uid": u, **{k: led["findings"][u].get(k) for k in ("title", "severity", "location", "cwe", "first_seen")}}
                 for u in uids]
-    return {"mode": "retest", "target": target, "engagement": args.engagement, "date": args.date,
-            "summary": {"fixed": len(fixed), "still_open": len(still_open), "regressed": len(regressed), "new": len(new)},
-            "fixed": brief(fixed), "still_open": brief(still_open), "regressed": brief(regressed), "new": brief(new)}
+    delta = {"mode": "retest", "target": target, "engagement": args.engagement, "date": args.date,
+             "summary": {"fixed": len(fixed), "still_open": len(still_open), "regressed": len(regressed), "new": len(new)},
+             "fixed": brief(fixed), "still_open": brief(still_open), "regressed": brief(regressed), "new": brief(new)}
+    # optionally fold the delta into a findings.json so render_report renders a Retest section
+    into = args.into or (args.findings if args.write_into else None)
+    if into:
+        with open(into, encoding="utf-8") as f:
+            fd = json.load(f)
+        fd["retest"] = {k: delta[k] for k in ("date", "summary", "fixed", "still_open", "regressed", "new")}
+        with open(into, "w", encoding="utf-8") as f:
+            json.dump(fd, f, indent=2, ensure_ascii=False)
+        delta["wrote_into"] = into
+    return delta
 
 
 def cmd_uid(args):
@@ -175,6 +185,8 @@ def main():
     ap.add_argument("--target", default="", help="filter by target (status) / target for uid")
     ap.add_argument("--cwe", default="", help="CWE id (uid mode)")
     ap.add_argument("--location", default="", help="finding location (uid mode)")
+    ap.add_argument("--into", default="", help="retest: also write the delta into this findings.json's 'retest' key (for render_report)")
+    ap.add_argument("--write-into", action="store_true", help="retest: write the delta back into the input findings.json")
     a = ap.parse_args()
     if a.mode in ("record", "retest") and not (a.findings and a.date):
         print(json.dumps({"error": f"{a.mode} needs <findings.json> and --date"})); sys.exit(2)

@@ -4,6 +4,21 @@ All notable changes to Redan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/). Versions are git-tagged (`vX.Y.Z`).
 
+## [0.4.1] — 2026-06-30
+
+*Report integration for the finding lifecycle.* Additive, backward-compatible.
+
+### Added
+- **`render_report.py`** now stamps the stable **`finding_uid`** on every finding and
+  shows it as a per-finding **Tracking ID** (md + html) — a cross-engagement reference
+  in the deliverable.
+- **Retest / remediation delta section** — when `findings.json` carries a `retest` block,
+  the report renders a "§ 1b. Retest / remediation delta" (fixed / still-open / new /
+  **regressed**) in both `report.md` and the standalone `report.html`.
+- **`finding_ledger.py retest --write-into`** (or `--into <findings.json>`) folds the
+  retest delta into a findings.json so the renderer picks it up. (`tests/test_render.py`
+  covers both the uid stamp and the rendered Retest section.)
+
 ## [0.4.0] — 2026-06-30
 
 *Finding lifecycle / retest — the first enterprise-program layer.* New capability,
@@ -137,6 +152,7 @@ modules** (68 → 72).
 chain-exploitation layer, independent verification, and a QA-gated single-source
 reporting pipeline. Proven on real engagements.
 
+[0.4.1]: https://github.com/LezNato/Redan/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/LezNato/Redan/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/LezNato/Redan/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/LezNato/Redan/compare/v0.3.1...v0.3.2

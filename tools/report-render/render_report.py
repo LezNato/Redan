@@ -266,6 +266,7 @@ def render_finding_html(f, embed=None):
         meta.append(f'<span><b>{_lbl}:</b> <code>{e(f["cvss_vector"])}</code></span>')
     if f.get("location"):    meta.append(f'<span><b>Location:</b> <code>{e(f["location"])}</code></span>')
     if f.get("validation_status"): meta.append(f'<span><b>Confidence:</b> {e(f["validation_status"])}</span>')
+    if f.get("finding_uid"): meta.append(f'<span><b>Tracking ID:</b> {e(f["finding_uid"])}</span>')
     if f.get("derived_from"):  # chain finding: cite the primitives it composes
         _df = f["derived_from"]
         _df = ", ".join(str(x) for x in _df) if isinstance(_df, list) else str(_df)
@@ -451,6 +452,30 @@ def render_html(d, css, embed=None):
             f'<p class="card__kicker">Standards &amp; coverage</p>'
             f'<h2 class="card__title">Standards coverage &amp; limitations</h2></div></div>'
             f'{asvs}{cov_table}{lim_html}{comp}</article>')
+    retest_html = ""
+    rt = d.get("retest")
+    if rt:
+        s = rt.get("summary", {})
+        def _rt_rows(items):
+            return "".join(f'<li><code>{e(x.get("uid",""))}</code> — {e(x.get("title",""))} '
+                           f'<span class="exec__pill sev--{sev_class(x.get("severity"))}">{e(x.get("severity",""))}</span></li>'
+                           for x in (items or []))
+        _blocks = ""
+        for _lbl, _k, _note in [("Regressed", "regressed", "previously fixed, now back — priority"),
+                                ("Still open", "still_open", "persisted since the last test"),
+                                ("Fixed", "fixed", "remediated since the last test"),
+                                ("New", "new", "first seen this test")]:
+            _items = rt.get(_k)
+            if _items:
+                _blocks += (f'<div class="block"><h4>{_lbl} ({len(_items)}) '
+                            f'<span class="exec__hint">{_note}</span></h4><ul>{_rt_rows(_items)}</ul></div>')
+        _date = f' (re-tested {e(rt["date"])})' if rt.get("date") else ""
+        retest_html = (f'<article class="card card--info"><div class="card__head"><div>'
+            f'<p class="card__kicker">Retest</p><h2 class="card__title">Retest / remediation delta{_date}</h2></div></div>'
+            f'<div class="card__meta"><span><b>Fixed:</b> {s.get("fixed",0)}</span>'
+            f'<span><b>Still open:</b> {s.get("still_open",0)}</span>'
+            f'<span><b>New:</b> {s.get("new",0)}</span>'
+            f'<span><b>Regressed:</b> {s.get("regressed",0)}</span></div>{_blocks}</article>')
     classification = eng.get("classification")  # declared handling label — NOT defaulted; a report carries a confidentiality marking only when the engagement explicitly sets one
     classification_html = f'<span class="confidential">{e(classification)}</span>' if classification else ""
     evidence_note = ("Evidence artifacts are embedded inline above (secrets/PII redacted) so this file is self-contained."
@@ -482,6 +507,7 @@ def render_html(d, css, embed=None):
   </header>
   <section class="scoreboard" aria-label="Findings by severity">{score_cards}</section>
   {exec_view_html}
+  {retest_html}
   {method_html}
   {coverage_html}
   <h2 class="section-h">Findings</h2>
@@ -519,6 +545,7 @@ def render_finding_md(f):
     else:
         out.append(f"**Severity:** {sev}  ")
     if f.get("location"):    out.append(f"**Location:** {f['location']}  ")
+    if f.get("finding_uid"): out.append(f"**Tracking ID:** `{f['finding_uid']}` (stable across re-tests)  ")
     if f.get("validation_status"): out.append(f"**Confidence:** {f['validation_status']}  ")
     if f.get("derived_from"):
         _df = f["derived_from"]
@@ -552,6 +579,26 @@ def render_finding_md(f):
     out += ["---", ""]
     return out
 
+def render_retest_md(rt):
+    s = rt.get("summary", {})
+    date = f" (re-tested {rt['date']})" if rt.get("date") else ""
+    L = [f"## 1b. Retest / remediation delta{date}", "",
+         "| Outcome | Count |", "|---|---|",
+         f"| Fixed (remediated since last test) | {s.get('fixed',0)} |",
+         f"| Still open (persisted) | {s.get('still_open',0)} |",
+         f"| New (first seen this test) | {s.get('new',0)} |",
+         f"| Regressed (was fixed, returned — priority) | {s.get('regressed',0)} |", ""]
+    def lst(title, items):
+        if not items:
+            return []
+        return [f"**{title}:**", ""] + [f"- `{x.get('uid','')}` — {x.get('title','')} ({x.get('severity','')})" for x in items] + [""]
+    L += lst("Regressed (priority — a previously-fixed issue is back)", rt.get("regressed"))
+    L += lst("Still open", rt.get("still_open"))
+    L += lst("Fixed", rt.get("fixed"))
+    L += lst("New", rt.get("new"))
+    L += ["---", ""]
+    return L
+
 def render_markdown(d):
     eng = d.get("engagement", {}) or {}
     target = eng.get("target") or eng.get("name") or "Target"
@@ -577,6 +624,8 @@ def render_markdown(d):
             if _items:
                 L.append(f"- **{_label}:** " + "; ".join(f"{f.get('id','')} — {f.get('title','')}" for f in _items))
         L.append("")
+    if d.get("retest"):
+        L += render_retest_md(d["retest"])
     if eng.get("authorization"):
         L += ["## 2. Scope & authorization", "",
               f"Authorization basis: **{eng.get('type','')}** — {eng['authorization']}. "
@@ -679,6 +728,16 @@ def main():
     except ImportError:
         pass
     d = json.loads(raw)
+    # stamp a STABLE cross-engagement finding_uid on each finding (the lifecycle/retest
+    # reference shown in the report) — computed from target+CWE+normalized-location so it
+    # survives object-id/title changes across runs. (tools/checks/finding_ledger.py.)
+    try:
+        from finding_ledger import finding_uid as _fuid
+        _tgt = (d.get("engagement", {}) or {}).get("target", "")
+        for _f in d.get("findings", []) or []:
+            _f.setdefault("finding_uid", _fuid(_tgt, _f.get("cwe"), _f.get("location")))
+    except ImportError:
+        pass
     # counts drift check: WARN (don't fail) if the declared counts disagree with the
     # actual findings — the rendered scoreboard uses the derived counts either way.
     _declared = d.get("counts")

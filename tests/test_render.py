@@ -75,6 +75,18 @@ def main():
     r = render(p)
     rec("clean findings render (exit 0)", r.returncode == 0, (r.stdout + r.stderr)[-160:])
     rec("report.md written", os.path.exists(os.path.join(d, "report.md")))
+    md = open(os.path.join(d, "report.md"), encoding="utf-8").read() if os.path.exists(os.path.join(d, "report.md")) else ""
+    rec("finding_uid stamped into the report (Tracking ID)", "Tracking ID" in md)
+
+    # a findings.json carrying a `retest` block renders the Retest / remediation delta section
+    rt = base()
+    rt["retest"] = {"date": "2026-04-15", "summary": {"fixed": 1, "still_open": 1, "new": 0, "regressed": 0},
+                    "fixed": [{"uid": "abc123def456", "title": "Old reflected XSS", "severity": "medium"}],
+                    "still_open": [], "new": [], "regressed": []}
+    dR, pR = write(rt)
+    render(pR)
+    mdR = open(os.path.join(dR, "report.md"), encoding="utf-8").read() if os.path.exists(os.path.join(dR, "report.md")) else ""
+    rec("retest block -> Retest/Delta section rendered", "Retest / remediation delta" in mdR and "Old reflected XSS" in mdR)
 
     # 2. advisory PII (email) RENDERS — the v0.3.0 regression (refused on PII) must stay fixed
     d2, p2 = write(base(desc="Contact the owner at security-reports@example.com to remediate."))
