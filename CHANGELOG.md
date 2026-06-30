@@ -4,6 +4,42 @@ All notable changes to Redan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/). Versions are git-tagged (`vX.Y.Z`).
 
+## [0.5.0] — 2026-06-30
+
+*Agnostic AI/LLM web-surface probe.* New capability, backward-compatible (a new
+tool; nothing else changes). 73 → **74 stdlib modules**.
+
+### Added
+- **`tools/checks/llm_probe.py`** — a vendor/framework-**agnostic** AI/LLM web-surface
+  probe (web-app scope only). Agnostic two ways: a **polyglot request body** that sets
+  the prompt under every common key at once (messages[].content / prompt / input /
+  message / query / text / q / question / content), so whichever key the handler reads
+  it gets the prompt; and a **computed detection marker** (asks the model to compute
+  `13*13` — the literal `169` is absent from the request, so a plain reflector/echo
+  endpoint can't forge it, the same reflection-proof asymmetry `cmd_inject` uses).
+  On a detected model it probes **prompt-injection** (an "ignore previous instructions"
+  override eliciting an attacker-chosen computed token `REDAN`+`17*17`), **system-prompt
+  leak** (an instruction-block heuristic the probe's own prompts are crafted not to
+  trip), and **unauthenticated MCP `tools/list`** exposure. Also discovers endpoints
+  across an agnostic path list + MCP JSON-RPC. Each signal is a **LEAD** (instruction-
+  following ≠ a security finding until impact is shown); an unauthenticated LLM endpoint
+  is recorded as **informational**, not a lead (a public chatbot is usually intended).
+  Emits the canonical `_result` contract; stdlib + `_http` only; a bounded detector
+  (LLM calls cost money), RoE-respecting.
+- **`tests/test_llm_probe.py`** + four lab endpoints in `tests/lab_server.py` — TP
+  (vulnerable LLM leads on injection + leak; MCP leads on tool exposure) **and**
+  FP-rejection (a **defended** LLM is detected but its injection/leak signals do NOT
+  fire; a **benign non-LLM reflector** is not detected as an LLM at all — the computed
+  marker is un-forgeable). 12 checks, wired into `run_all.py` / CI.
+
+### Changed
+- **Docs + dispatch** — `llm_probe` added to the `tools/checks/README.md` catalog, the
+  CLAUDE.md / README inventories (74-module count), and the `methodology.md` vuln-class
+  dispatch (AI chatbot / chat-completion / MCP → `llm_probe`). New **pitfalls.md** §
+  "AI / LLM surface" (the verifier's reference: reachable chatbot ≠ finding; instruction-
+  following ≠ injection without impact; computed marker is detection not the vuln; a
+  leaked system prompt may be hallucinated; exposed MCP ≠ exploitable tools).
+
 ## [0.4.2] — 2026-06-30
 
 *Lifecycle pipeline wiring + web-only scope clarity.* Additive, backward-compatible.

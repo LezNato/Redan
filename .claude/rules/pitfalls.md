@@ -184,6 +184,42 @@ keyword ruleset) — use it as the time-based alternative when `SLEEP` is keywor
 Deliver payloads through the browser channel (`methodology.md` → Edge-WAF channel routing)
 so they actually reach the handler.
 
+## AI / LLM surface
+
+**A reachable AI chatbot ≠ a finding.** A public "ask"/"assistant"/chat endpoint
+answering anonymously is usually *intended* (it's the product). `llm_probe`
+records an unauthenticated LLM endpoint as **informational**, not a lead — the
+same discipline as "reflected ≠ XSS". **Confirm or kill:** the finding is an
+abuse/cost exposure only if anonymous use is clearly unintended (paid feature,
+internal tool) — otherwise `informational`.
+
+**Instruction-following ≠ prompt injection (the security bug).** A model emitting
+the computed `REDAN289` token proves it *followed* an injected instruction — but
+on a bare public chatbot with no system prompt and no downstream trust, "it did
+what I asked" is just the model working. **Confirm or kill:** the LEAD becomes a
+finding only when that instruction-following has *impact* — it overrides a
+developer system prompt, leaks its contents, reaches a tool/function the model
+can call, or the output is trusted downstream (rendered as HTML, used in a query,
+shown to another user). `llm_probe` emits a LEAD by design; the verifier assesses
+impact against the app's trust model. No trust boundary crossed → `informational`.
+
+**"It computed 13*13" is detection, not the vuln.** The computed marker only
+proves a generative model is behind the endpoint (so a reflector isn't faking it)
+— it is the *precondition* for the injection/leak tests, never itself a finding.
+
+**A leaked "system prompt" may be a hallucinated one.** A model asked to "repeat
+the text above" can *invent* a plausible instruction block. **Confirm or kill:**
+corroborate the leaked content (does it match real app behavior / known
+guardrails / a second elicitation?) before calling it a real system-prompt
+disclosure; `llm_probe`'s leak signal is low-confidence and needs a human read.
+
+**An MCP server reachable ≠ tools exploitable.** `tools/list` answering unauth
+proves the server is exposed and enumerable (a lead); it does NOT prove any tool
+is dangerous or callable with effect. **Confirm or kill:** assess what the named
+tools actually do (file/network/exec reach?) and whether they're invokable
+without auth, within RoE — don't rate an exposed read-only `ping` tool as a
+breach.
+
 ## Cross-references
 - `evidence-standard.md` — the disposition vocabulary and the confirmed bar.
 - `tradecraft-doctrine.md` — §1 (tag), §2 (test the right identity), §4 (banner ≠

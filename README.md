@@ -3,7 +3,7 @@
 <p align="center"><em>A multi-agent web pentest toolkit for Claude Code — every finding is independently verified and QA-gated.</em></p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-v0.4.2-blue.svg" alt="Version: v0.4.2">
+  <img src="https://img.shields.io/badge/version-v0.5.0-blue.svg" alt="Version: v0.5.0">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/core-stdlib--only-success.svg" alt="Core: stdlib-only">
@@ -66,7 +66,7 @@ scope.yaml -> /pentest -> recon · web-tester · auth-tester · cloud-iam
 ```
 
 - **8 agents** (`.claude/agents/`) — finders → `verifier` (refute) → `exploiter` (chains) → `reporter` → `qa-auditor`. Mixed-model: `sonnet` finders, `opus` judgment.
-- **73 stdlib modules** (`tools/checks/`, stdlib-only, JSON) — recon, active testing (injection, XSS, SSRF, access control, request smuggling, file upload, SOAP/XXE, rate limiting, JWT, …), authenticated testing, edge-egress rotation, and reporting. Full catalog: [`tools/checks/README.md`](tools/checks/README.md).
+- **74 stdlib modules** (`tools/checks/`, stdlib-only, JSON) — recon, active testing (injection, XSS, SSRF, access control, request smuggling, file upload, SOAP/XXE, rate limiting, JWT, AI/LLM surface, …), authenticated testing, edge-egress rotation, and reporting. Full catalog: [`tools/checks/README.md`](tools/checks/README.md).
 - **Tested + self-auditing** — a committed [`tests/`](tests/) suite (offline 127.0.0.1 lab, **true-positive AND false-positive-rejection** per covered injection detector + the authed IDOR oracle, plus broad import/compile smoke across all modules) plus a deterministic **doctrine self-audit** (`tools/checks/doctrine_lint.py`) that scans the kit's own adherence to [`.claude/rules/`](.claude/rules/). Both gate CI ([`.github/workflows/tests.yml`](.github/workflows/tests.yml)). Run locally: `python tests/run_all.py`.
 - **Edge-egress rotation** — `proxy_rotate.py` sources free public HTTP proxies to beat per-IP graylists; `browser_probe.py --proxy` routes headless Chromium through them to solve JS proof-of-work challenges (beats BOTH an Imunify360 graylist AND its JS PoW — no Tor required).
 - **Chain exploitation** — the `exploiter` combines confirmed issues into full attack chains (JWT-forge→account takeover, SSRF→internal metadata, IDOR at scale).
@@ -113,7 +113,7 @@ A black-box test proves what it *found*, not that *no vulnerability exists*. A r
 
 ```
 .claude/{agents,rules,skills,workflows,hooks}/   the ensemble + doctrine + orchestration
-tools/checks/                                     73 stdlib modules (stdlib-only, JSON)
+tools/checks/                                     74 stdlib modules (stdlib-only, JSON)
 tests/                                            offline TP+FP lab suite + doctrine self-audit (CI-gated)
 tools/report-render/                              findings.json -> report.md/html + SARIF/Jira/DefectDojo
 tools/external/                                   nuclei + sqlmap binaries (gitignored, bootstrapped)
