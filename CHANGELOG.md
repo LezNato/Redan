@@ -4,6 +4,23 @@ All notable changes to Redan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/). Versions are git-tagged (`vX.Y.Z`).
 
+## [0.4.2] — 2026-06-30
+
+*Lifecycle pipeline wiring + web-only scope clarity.* Additive, backward-compatible.
+
+### Added
+- **`/pentest-retest` skill** — re-test a previously-assessed site: build the run's
+  findings.json, `finding_ledger retest --write-into`, re-render (so the report carries
+  the Retest / remediation delta), then QA-gate. Verify-the-fix + regression in one flow.
+- **`/pentest-report` auto-records** each engagement into the cross-engagement ledger
+  (`finding_ledger record`) so the lifecycle stays current without manual tool calls.
+
+### Changed
+- **Scope clarity** — docs state plainly that Redan is **web only** (web applications &
+  sites, their APIs, and externally-observable web/cloud exposure); out of scope by
+  choice: network / host / Active Directory / mobile / white-box SAST. The retest/
+  multi-engagement capability moved from "deferred" to "built" in the status.
+
 ## [0.4.1] — 2026-06-30
 
 *Report integration for the finding lifecycle.* Additive, backward-compatible.
@@ -152,6 +169,7 @@ modules** (68 → 72).
 chain-exploitation layer, independent verification, and a QA-gated single-source
 reporting pipeline. Proven on real engagements.
 
+[0.4.2]: https://github.com/LezNato/Redan/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/LezNato/Redan/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/LezNato/Redan/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/LezNato/Redan/compare/v0.3.2...v0.3.3

@@ -1,8 +1,10 @@
 # Redan — a pentest agent ensemble
 
-A Claude Code-native toolkit for **authorized** security testing of web apps/APIs
-and cloud/IAM surface. Built on an ensemble pattern — many specialty agents + a
-core evidence discipline
+A Claude Code-native toolkit for **authorized** penetration testing of **web
+applications and sites** — their APIs and externally-observable web/cloud exposure.
+That is Redan's entire scope: **web only** — NOT network, host, Active Directory,
+mobile, or white-box SAST (out of scope by choice). Built on an ensemble pattern —
+many specialty agents + a core evidence discipline
 ("every claim traces to an evidence row" → here: **every finding traces to a
 reproduction**).
 
@@ -33,8 +35,9 @@ scope.yaml ─► /pentest ─► recon · web-tester · auth-tester · cloud-ia
   frontmatter). The value of a bigger model is on verify/QA, not recon.
 - **Skills:** `/pentest-init <slug>` bootstraps an engagement (authorization +
   scope); `/pentest <target>` runs the methodology; `/pentest-report` (re)builds
-  the deliverable; `/pentest-qa` runs the pre-delivery QA gate. (Invoke via the
-  Skill tool.)
+  the deliverable; `/pentest-retest` diffs a re-test of a previously-tested site
+  against the cross-engagement ledger (fixed / still-open / new / regressed delta);
+  `/pentest-qa` runs the pre-delivery QA gate. (Invoke via the Skill tool.)
 
 ## The gate — `scope.yaml`
 
@@ -97,7 +100,7 @@ pipeline → hard limits → bar:
 |---|---|
 | Authorization gate | `scope.yaml` |
 | Agents | `.claude/agents/*.md` |
-| Orchestration skills | `.claude/skills/{pentest-init,pentest,pentest-report,pentest-qa}/SKILL.md` |
+| Orchestration skills | `.claude/skills/{pentest-init,pentest,pentest-report,pentest-retest,pentest-qa}/SKILL.md` |
 | Reusable workflows | `.claude/workflows/{pentest-assess,qa-gate,plugin_cve_research,toolkit-consistency-audit}.js` — named, parameterized multi-agent workflows run by name: `Workflow({name:'pentest-assess', args:{target,engagement}})` (parallel vuln-class finders → opus verify), `Workflow({name:'qa-gate', args:{engagement}})` (5-lens pre-delivery audit → PASS/BLOCK), and `Workflow({name:'plugin_cve_research', args:{plugins:[{slug,name,version},...]}})` (systematic CVE research across NVD/Wordfence/Patchstack/WPScan for a plugin inventory — fills the OSV WordPress-coverage gap), and `Workflow({name:'toolkit-consistency-audit'})` (repo-wide consistency/drift audit — no engagement hardcoding, stale refs, doc-code drift). The committed, generalizable patterns; target-specific runs stay session-transient. |
 | Engagement template | `engagements/_template/{authorization.md,scope.yaml,leads.md,evidence/,roles.example.json,README.md}` (copied by `/pentest-init`) |
 | Hooks | `.claude/hooks/{scope-gate.py,mutation-gate.py,session-start.sh}` (scope-gate = host allow/deny, **fail-CLOSED on missing scope for external hosts**, gates the request-issuing browser tools; mutation-gate = auth testing read-only by default) |
@@ -177,11 +180,15 @@ pre-flight → 5-lens panel → PASS/BLOCK) auto-runs at `/pentest` Phase 5.
 
 ### Built vs deferred
 - **Client intake**: `/pentest-init` + `authorization.md` + `scope.yaml` per engagement.
-- **Coverage**: full web-class surface (detector + breach-finder + chain-synthesis). **Out of scope
-  by choice**: network / Active Directory / mobile / white-box SAST.
+- **Coverage**: full **web-application/site** surface (detector + breach-finder + chain-synthesis).
+  Redan is **web only**. **Out of scope by choice**: network / host / Active Directory / mobile /
+  white-box SAST.
 - **Authenticated testing**: built + E2E-validated (canary IDOR oracle + json login + funclevel +
   massassign); needs provisioned TEST accounts for a real engagement.
+- **Finding lifecycle / retest**: built — `finding_ledger` (stable `finding_uid` across engagements,
+  fixed/still-open/new/regressed delta) + `/pentest-retest` + the report's Retest/Delta section.
+  `/pentest-report` auto-records; the ledger lives at `engagements/_ledger.json` (gitignored).
 - **Qualification** (human peer-review/sign-off): intentionally out of scope (the kit does tooling,
   not qualification).
-- **Deferred** (need a prerequisite): retest/multi-engagement cluster (needs repeat clients +
-  finding_id prior-engagement lookup); `--remote`/scheduled intake.
+- **Deferred** (need a prerequisite): `--remote`/scheduled intake; a multi-client portfolio
+  dashboard over the ledger.

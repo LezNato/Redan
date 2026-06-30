@@ -3,7 +3,7 @@
 <p align="center"><em>A multi-agent web pentest toolkit for Claude Code — every finding is independently verified and QA-gated.</em></p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-v0.4.1-blue.svg" alt="Version: v0.4.1">
+  <img src="https://img.shields.io/badge/version-v0.4.2-blue.svg" alt="Version: v0.4.2">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/core-stdlib--only-success.svg" alt="Core: stdlib-only">
@@ -36,6 +36,8 @@ findings.
 4. `/pentest <target>` — recon → active finders (parallel) → `verifier` → (optional) `exploiter` → `reporter`.
 5. `/pentest-report` — `findings.json` → `report.md` + standalone HTML (dark); PDF is a separate headless-browser print step.
 6. `/pentest-qa` — a report isn't final until the QA gate returns `PASS`.
+
+> **Re-testing a site you've assessed before?** `/pentest-retest` diffs the new run against the cross-engagement ledger (stable per-finding `finding_uid`) and folds a **fixed / still-open / new / regressed** delta into the report — verify-the-fix + regression tracking.
 
 ## Prerequisites
 
@@ -70,6 +72,7 @@ scope.yaml -> /pentest -> recon · web-tester · auth-tester · cloud-iam
 - **Chain exploitation** — the `exploiter` combines confirmed issues into full attack chains (JWT-forge→account takeover, SSRF→internal metadata, IDOR at scale).
 - **Reporting** — `findings.json` → `report.md` + standalone HTML (CSS + evidence inlined — one file, no loose artifacts) + PDF. Per-finding OWASP/WSTG/ATT&CK + CVSS/CWE. Export → SARIF / Jira / DefectDojo.
 - **QA gate** — mechanical pre-flight (`finding_schema` + `redact`) → 5-lens panel → `PASS`/`BLOCK`.
+- **Finding lifecycle / retest** — `finding_ledger` tracks each finding by a stable `finding_uid` across engagements; `/pentest-retest` renders a **fixed / still-open / new / regressed** delta (verify-the-fix + regression) into the report.
 
 <details>
 <summary><b>Sample finding</b> — what a confirmed finding looks like in the report</summary>
@@ -100,7 +103,7 @@ When test accounts are provisioned, credentials stay **out of the repo** under `
 
 ## Posture
 
-Built for real engagements — own assets, bug-bounty, CTF/lab, or signed client work. The methodology maps to OWASP WSTG/ASVS, OWASP API Top 10, PTES, NIST SP 800-115, CWE/CVSS, MITRE ATT&CK. It's a serious tool, not a complete one: **out of scope by choice** (network / Active Directory / mobile / white-box SAST), and a black-box test always has blind spots — see Coverage honesty.
+Redan is a **web application & site** pentest kit — that is its entire scope (web apps, their APIs, and externally-observable web/cloud exposure). Built for real engagements — own assets, bug-bounty, CTF/lab, or signed client work. The methodology maps to OWASP WSTG/ASVS, OWASP API Top 10, PTES, NIST SP 800-115, CWE/CVSS, MITRE ATT&CK. It's a serious tool, not a complete one: **out of scope by choice** (network / Active Directory / mobile / host / white-box SAST), and a black-box test always has blind spots — see Coverage honesty.
 
 ## Coverage honesty
 

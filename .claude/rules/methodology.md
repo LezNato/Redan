@@ -47,6 +47,11 @@ until the **verifier** has tried to refute them.
    severity discipline, CVE corroboration, redaction, coverage, RoE. `BLOCK` →
    fix and re-run. A report is not final/client-ready until the gate returns
    `PASS`. (Skill: `/pentest-qa`.)
+7. **Lifecycle (cross-engagement).** Reporting auto-records findings into the
+   ledger by a stable `finding_uid` (`finding_ledger record`). Re-testing a
+   previously-assessed site? `/pentest-retest` diffs against the ledger and folds a
+   **fixed / still-open / new / regressed** delta into the report — verify-the-fix +
+   regression. (Web-app findings only, like everything here.)
 
 ## Orchestration notes
 
