@@ -656,18 +656,26 @@ def main():
     src = pos[0]
     with open(src, encoding="utf-8") as fh:
         raw = fh.read()
-    # redaction chokepoint: never render credential material into a deliverable.
-    # _redactor is reused to neutralize embedded evidence text on the way into report.html.
+    # redaction chokepoint: never render a CREDENTIAL into a deliverable (refuse).
+    # PII (emails / contact + remediation addresses) is ADVISORY — a report legitimately
+    # carries them and the qa-gate treats PII as advisory (BLOCK only with --strict), so a
+    # PII hit in the author-written findings.json is a note, NOT a refuse. Embedded raw
+    # evidence text is still PII-neutralized on the way into report.html (via _redactor).
     _checks = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "checks")
     sys.path.insert(0, _checks)
     _redactor = None
     try:
-        from redact import redact_text as _redactor
-        _, _hits = _redactor(raw)
-        if _hits:
-            print(f"REFUSING TO RENDER: findings.json contains {_hits} credential-pattern hit(s). "
+        from redact import redact_text as _redactor, scan_file as _scan_file
+        _hits = _scan_file(src)
+        _secret = [h for h in _hits if h.get("category") == "secret"]
+        _pii = [h for h in _hits if h.get("category") == "pii"]
+        if _secret:
+            print(f"REFUSING TO RENDER: findings.json contains {len(_secret)} credential-pattern hit(s). "
                   f"Run: python tools/checks/redact.py scan {src} — then redact and retry.")
             sys.exit(4)
+        if _pii:
+            print(f"note: {len(_pii)} advisory PII hit(s) in findings.json (e.g. a contact/remediation "
+                  f"address) rendered as-is; embedded evidence PII is redacted on the way in.")
     except ImportError:
         pass
     d = json.loads(raw)

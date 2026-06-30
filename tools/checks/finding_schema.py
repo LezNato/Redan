@@ -133,6 +133,14 @@ def validate(d, evidence_root=None):
             if rid not in present:
                 errors.append(f"evidence_index[{i}] ref '{rid}' is a DANGLING reference "
                               f"(no such finding/lead/info id) — stale after a move/downgrade (doctrine §9)")
+        # well-formedness: the renderer reads file/contents/ref — a row missing 'file'
+        # (e.g. a legacy 'path'/'desc' row) renders as a BLANK appendix row + drops the
+        # artifact's embed/caption linkage. Was a human-lens-only catch; now deterministic.
+        if isinstance(x, dict) and not x.get("file"):
+            legacy = [k for k in ("path", "desc") if k in x]
+            hint = f" (has legacy {legacy} key(s) — rename to file/contents)" if legacy else ""
+            errors.append(f"evidence_index[{i}] has no 'file' value{hint} — renders as a BLANK "
+                          f"appendix row (the renderer reads file/contents/ref)")
 
     # --- chain provenance: a chain finding's derived_from primitive ids must resolve
     #     (the exploiter emits derived_from:[F-..]; an unresolvable id is a dangling chain link) ---
