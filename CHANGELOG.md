@@ -4,6 +4,60 @@ All notable changes to Redan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/). Versions are git-tagged (`vX.Y.Z`).
 
+## [0.8.0] — 2026-07-01
+
+*The exploiter's exploit-dev lane — a gated, captured surface for bespoke one-off PoCs.*
+New agent capability, backward-compatible; **no new module** (the count stays **75 stdlib
+modules** — this is doctrine + a template scaffold + a self-audit check, not a tool). Stays
+**web-app only**.
+
+### Added
+- **Exploit-dev lane** (`engagements/<name>/exploit-dev/`, gitignored) — when a confirmed
+  primitive or strong lead needs **bespoke exploit code no fixed probe covers** (a custom
+  HMAC/signature gate, an app-specific logic flaw, an odd serialization format, a multi-step
+  business-logic chain), the `exploiter` authors + runs a one-off PoC there, captures the
+  redacted output + transcript as evidence. The capability was **latent** (the agent already has
+  `Bash` + Python); this formalizes it as a disciplined, captured, gated lane. The closest
+  architectural edge a fixed-probe kit lacked vs. open-ended agents — now in-scope and on-rails.
+  - **Gated two ways, lifts nothing** — off by default; only under `scope.yaml:
+    mutation_testing: approved` + an `authorization.md` basis. Enforced by (1) **`mutation-gate.py`**,
+    which now hard-denies running any `exploit-dev/<...>.py` unless approved (the PoC *path* is on the
+    command line — deterministic, even though the target host + HTTP verbs live inside the .py where the
+    host/verb-scanning hooks can't see them), and (2) the **scaffold's `_kit()` self-check**, which
+    refuses fail-closed unless approved AND the request host is `in_scope`. Every RoE limit still binds
+    (non-destructive, one redacted proof then STOP, no DoS, stay in scope).
+  - **The honesty anchor** — a PoC that prints "VULNERABLE" proves nothing (you wrote the
+    print). It is `confirmed`/`verified` ONLY after the verifier reproduces the **effect** by a
+    method that does NOT re-run the script — replaying its emitted transcript (`replay.py`, the
+    cheap default) or independent re-derivation. A PoC reproducible only by its own code stays a
+    **lead** (`available`). Falsification is built into the scaffold (a `control()` that must
+    independently fail beside the `exploit()`).
+- **`engagements/_template/exploit-dev/{_poc_template.py, README.md}`** — the committed scaffold:
+  the `control()`/`exploit()` delta structure, fail-closed scope-guarded `_http` helpers (`_kit()`),
+  a faithful `replay.py`-format transcript emitter (captures the REAL request sent, parseable by
+  `replay.py` — round-trip tested), per-PoC transcript filenames, a redaction reminder, and a
+  LEAD-only verdict line (never "confirmed"). `from oob import Collab` is available for blind PoCs.
+- **`doctrine_lint.py` C11** — *no real engagement data is git-tracked*: only `engagements/_template/`
+  (and `engagements/.gitkeep`) may be committed; evidence, bespoke exploit-dev PoCs, and findings
+  must stay gitignored. A target-data leak guard for the blanket `engagements/*` ignore (the lane
+  makes target-specific PoCs easy to author). Pure helper `_engagement_leaks()` is unit-tested
+  (`tests/test_doctrine_lint.py` check (h)).
+- **`tests/test_exploit_dev_lane.py`** — the lane's two failure-critical seams: the scaffold's
+  transcript round-trips through `replay.py` (the verifier confirmation path works out of the box),
+  its `_kit()` scope guard is fail-closed (in-scope + subdomain allowed; out_of_scope/unknown
+  refused), and `mutation-gate.py` flags a real exploit-dev run while exempting the committed template.
+
+### Changed
+- **`.claude/hooks/mutation-gate.py`** — now also gates the exploit-dev lane: a path-based hard-deny
+  of any `exploit-dev/<...>.py` run unless `mutation_testing: approved` (the committed `_template`
+  scaffold is exempt — it carries only a placeholder target, so smoke/compile still run).
+- Doctrine wired end-to-end — `.claude/agents/{exploiter,verifier}.md` (the lane + its bespoke-PoC
+  reproduction discipline, incl. the replay-must-reach-the-in-scope-target caveat), `evidence-standard.md`
+  (Bespoke-PoC reproduction), `pitfalls.md` ("A PoC that prints SUCCESS isn't a finding"),
+  `engagement-loop.md` step 4 (the gated exploit-angle substrate), `/pentest` Phase 3.5, and CLAUDE.md
+  (chain-exploitation layer + the engagement-path tables). Fixed probe FIRST; the lane only for the
+  genuinely uncovered surface.
+
 ## [0.7.0] — 2026-07-01
 
 *Bulk screenshot triage.* New recon/triage tool, backward-compatible. 74 → **75 stdlib modules**.
@@ -261,6 +315,7 @@ modules** (68 → 72).
 chain-exploitation layer, independent verification, and a QA-gated single-source
 reporting pipeline. Proven on real engagements.
 
+[0.8.0]: https://github.com/LezNato/Redan/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/LezNato/Redan/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/LezNato/Redan/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/LezNato/Redan/compare/v0.4.2...v0.5.0

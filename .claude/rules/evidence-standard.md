@@ -41,6 +41,16 @@ Medium absent strong cause. The `validation_status` enum and severity-vs-CVSS-ba
 validated by `finding_schema.py`; the High→Medium downgrade itself is a verifier judgment
 (qa-gate item 3).
 
+**Bespoke-PoC reproduction (the exploit-dev lane).** When a finding rests on a one-off PoC the
+`exploiter` wrote (the gated `exploit-dev/` lane), re-running *that same script* is NOT
+independent verification — a bug or shared false assumption in it reproduces faithfully
+(`tradecraft-doctrine.md` §5). It is `verified` only if the verifier reproduces the **effect** by
+a method that does NOT re-execute the PoC's own logic — replaying its emitted transcript
+(`replay.py`, against the real in-scope target — not a PoC-named local/staging host) or
+independent re-derivation. A PoC reproducible only by running its own code is
+`available` (→ a `lead`), never `verified`. A PoC self-asserting "VULNERABLE" with no
+independently-failing control is `refuted`/`lead` (`pitfalls.md` → "A PoC that prints SUCCESS").
+
 ## A finding MUST have
 1. **Title + class** — what it is (e.g. "IDOR on /api/orders/{id}", CWE-639).
 2. **Location** — exact URL/endpoint/parameter/resource.

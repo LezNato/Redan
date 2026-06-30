@@ -59,6 +59,19 @@ When a finding could fail in more than one way, check each way (does-it-reproduc
 - For JWT candidates, refute/reproduce with `jwt_probe.py --token <jwt> --crack
   --attack-url <url> --claim role=admin` (offline HS crack + active forge; each forged
   variant is paired with a wrong-signature control, so acceptance is decisive).
+- **For an exploit-dev PoC** (a bespoke one-off the exploiter wrote under
+  `engagements/<name>/exploit-dev/`): re-running the PoC's own script is NOT independent
+  verification — a logic bug or shared false assumption in it reproduces faithfully (§5
+  self-consistent false positive). Reproduce the **effect** by a method that does NOT re-run
+  the script: replay its emitted transcript from a clean session (`replay.py --transcript
+  <poc>.transcript --diff`, the cheap default) or, for dynamic-state exploits (re-signed
+  request / fresh nonce) that won't statically replay, re-derive it yourself from the PoC's
+  *description*. A PoC reproducible only by running its own code is a **lead** (`available`),
+  not `verified` — and confirm the **control** half independently FAILS (a PoC that prints
+  "VULNERABLE" with no failing control is `refuted`/`lead`, never confirmed; see `pitfalls.md`).
+  **Confirm the replay reaches the real in-scope target** — check the transcript's `Host` /
+  replay.py's reported `target`; a transcript pointed at a PoC-named local/staging host
+  "reproduces" the PoC's own captured bytes, not a real effect on the engagement target.
 
 ## Verdict (return for each)
 Use the canonical dispositions from `evidence-standard.md`:

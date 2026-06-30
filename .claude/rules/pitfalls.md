@@ -170,6 +170,16 @@ the finding. Frameable + no sensitive action = informational (hardening — the 
 prove reach to anything sensitive. Internal-reach to metadata/127.0.0.1 = the finding; a callback to
 an external host with no internal reach = a lead.
 
+**A PoC that prints SUCCESS isn't a finding (the exploit-dev lane).** A bespoke one-off the
+`exploiter` wrote prints whatever it was coded to — "VULNERABLE"/"SUCCESS" is the *script's*
+verdict, not the *target's*. This is the easiest place to fabricate a finding ("I wrote an exploit,
+it worked"). **Confirm or kill:** (1) the `control()` half — the same script against a resource that
+SHOULD be safe — must independently FAIL (not print SUCCESS too); a positive with no failing control
+is benign behavior misread. (2) The verifier must reproduce the **effect** by a method that does NOT
+re-run the script — replay its transcript from a clean session, or re-derive it. A PoC whose success
+is reproducible only by running its own code → `lead`/`refuted`, never `confirmed` (doctrine §5;
+`evidence-standard.md` → Bespoke-PoC reproduction).
+
 ## WAF SQL-signature bypass (keyword rules + inline-comment / error-based evasion)
 
 **Imunify360-class WAFs match dangerous FUNCTION names, not operators.** A payload using

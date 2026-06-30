@@ -24,6 +24,10 @@ Checks:
   C10 a render/export redaction REFUSE (sys.exit 4) keys off categorized secret_hits
       (redact.scan/scan_file), never redact_text's TOTAL count — which now includes
       advisory PII and would wrongly block a report carrying a contact address.
+  C11 no real engagement data is git-TRACKED — only engagements/_template/ (and a
+      .gitkeep) may be committed; everything else under engagements/ (evidence, bespoke
+      exploit-dev PoCs, findings) must stay gitignored. A target-data leak guard for the
+      blanket `engagements/*` ignore (the exploit-dev lane makes target-specific PoCs easy).
 
 Usage: python tools/checks/doctrine_lint.py            # exit 1 on any violation
 """
@@ -273,6 +277,33 @@ def c10_redaction_refuse_categorized(rr_dir=None):
     return violations
 
 
+def _engagement_leaks(tracked):
+    """Given git-tracked paths under engagements/, return those that are NOT the committed
+    template (the leak set). Pure — unit-testable without a git repo."""
+    out = []
+    for rel in sorted({f.strip().replace("\\", "/") for f in tracked if f.strip()}):
+        if rel.startswith("engagements/_template/") or rel == "engagements/.gitkeep":
+            continue
+        out.append(rel)
+    return out
+
+
+def c11_engagement_data_untracked():
+    """No real engagement data is git-tracked. Everything under engagements/ except the
+    committed _template/ (and the engagements/.gitkeep) must be gitignored — a tracked
+    evidence file / bespoke exploit-dev PoC / findings.json is a target-data LEAK into public
+    history. The exploit-dev lane makes bespoke target-specific PoCs easy to author, so this
+    guards that the blanket `engagements/*` ignore can't silently regress. Skips if no git."""
+    try:
+        out = subprocess.run(["git", "ls-files", "engagements/"], cwd=REPO,
+                             capture_output=True, text=True, timeout=30).stdout
+    except Exception:
+        return []  # no git -> skip (don't fail the build on environment)
+    return [f"{rel}: engagement data is git-TRACKED — only engagements/_template/ may be "
+            f"committed (real evidence/PoCs/findings must stay gitignored: leak risk)"
+            for rel in _engagement_leaks(out.split("\n"))]
+
+
 CHECK_FNS = [
     ("C1 no-hard-CONFIRMED verdicts", c1_no_hard_confirmed),
     ("C2 redact covers QA-gate classes", c2_redact_coverage),
@@ -284,6 +315,7 @@ CHECK_FNS = [
     ("C8 tool doc-code drift", c8_tool_doc_drift),
     ("C9 stated module count is accurate", c9_module_count),
     ("C10 redaction refuse uses categorized secret hits", c10_redaction_refuse_categorized),
+    ("C11 engagement data is untracked", c11_engagement_data_untracked),
 ]
 
 

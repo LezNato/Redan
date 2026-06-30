@@ -11,9 +11,18 @@ Denies when a Bash/PowerShell command issues a mutating HTTP method
 with --allow-mutation/--method <verb>, or curl -X <verb> carrying a Cookie/
 Authorization/-b cookie. Default posture: mutations are blocked.
 
+Also gates the **exploit-dev lane**: a command running a `.py` under a real
+engagement's `exploit-dev/` directory (the exploiter's bespoke-PoC scratch) is an
+active-exploitation action, so it is hard-denied unless `mutation_testing: approved`.
+The PoC's target host + HTTP verbs live INSIDE the .py (invisible to a host/verb
+scan), but the `exploit-dev/<...>.py` PATH is on the command line — so this path-based
+check is the deterministic mechanical gate for the lane (the scaffold ALSO self-checks
+scope+approval fail-closed; the committed `_template/exploit-dev/` scaffold is exempt —
+it carries only a placeholder target). This is the enforcement the lane docs point to.
+
 Contract: stdin = hook JSON. exit 0 = allow. exit 2 + stderr = deny. Fail-OPEN on
-parser error (a broken gate must not brick the session), but the auth_request.py
-tool ALSO self-enforces the allowlist, so this is defense-in-depth.
+parser error (a broken gate must not brick the session), but auth_request.py AND the
+exploit-dev scaffold ALSO self-enforce, so this is defense-in-depth.
 """
 import sys, json, re, os
 
@@ -43,6 +52,16 @@ def is_auth_mutation(cmd):
         return True
     return False
 
+def is_exploit_dev_run(cmd):
+    """A command running a `.py` under a real engagement's exploit-dev/ scratch dir = the
+    bespoke-PoC lane (active exploitation). The committed `_template/exploit-dev/` scaffold is
+    NOT gated — it carries only a placeholder target (so py_compile / smoke tests still run)."""
+    if not re.search(r'exploit-dev[\\/]\S*\.py', cmd):
+        return False
+    if re.search(r'_template[\\/]exploit-dev', cmd):  # the harmless committed scaffold
+        return False
+    return True
+
 def main():
     try:
         data = json.load(sys.stdin)
@@ -53,13 +72,21 @@ def main():
     cmd = (data.get("tool_input") or {}).get("command", "")
     if not cmd:
         sys.exit(0)
-    if is_auth_mutation(cmd) and not approved():
-        sys.stderr.write(
-            "[mutation-gate] DENIED: authenticated state-changing request (POST/PUT/PATCH/DELETE) "
-            "while mutation_testing is not approved. Authenticated testing is READ-ONLY by default. "
-            "If the engagement contract authorizes write testing against TEST accounts, set "
-            "`mutation_testing: approved` in scope.yaml (record it in authorization.md) and retry.\n")
-        sys.exit(2)
+    if not approved():
+        if is_auth_mutation(cmd):
+            sys.stderr.write(
+                "[mutation-gate] DENIED: authenticated state-changing request (POST/PUT/PATCH/DELETE) "
+                "while mutation_testing is not approved. Authenticated testing is READ-ONLY by default. "
+                "If the engagement contract authorizes write testing against TEST accounts, set "
+                "`mutation_testing: approved` in scope.yaml (record it in authorization.md) and retry.\n")
+            sys.exit(2)
+        if is_exploit_dev_run(cmd):
+            sys.stderr.write(
+                "[mutation-gate] DENIED: running a bespoke exploit-dev PoC while mutation_testing is not "
+                "approved. The exploit-dev lane is active exploitation — off by default. If the engagement "
+                "authorizes it, set `mutation_testing: approved` in scope.yaml (record the basis in "
+                "authorization.md) and retry.\n")
+            sys.exit(2)
     sys.exit(0)
 
 if __name__ == "__main__":

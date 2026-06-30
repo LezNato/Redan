@@ -76,6 +76,16 @@ def main():
     rec("C9 regex ignores non-count <N> <noun> prose", not any(cc.search(s) for s in neg),
         str([s for s in neg if cc.search(s)]))
 
+    # (h) C11 leak-guard: a tracked engagement file OUTSIDE _template is a leak; the
+    #     committed template (incl. its exploit-dev scaffold) and .gitkeep are not.
+    leak = ["engagements/glnet/evidence/cap.txt", "engagements/acme/exploit-dev/poc_1.py"]
+    safe = ["engagements/_template/scope.yaml",
+            "engagements/_template/exploit-dev/_poc_template.py", "engagements/.gitkeep"]
+    rec("C11 flags tracked real-engagement data", doctrine_lint._engagement_leaks(leak) == sorted(leak),
+        str(doctrine_lint._engagement_leaks(leak)))
+    rec("C11 ignores _template + .gitkeep", doctrine_lint._engagement_leaks(safe) == [],
+        str(doctrine_lint._engagement_leaks(safe)))
+
     npass = sum(CHECKS)
     print(f"\n{npass}/{len(CHECKS)} checks passed")
     sys.exit(0 if npass == len(CHECKS) else 1)

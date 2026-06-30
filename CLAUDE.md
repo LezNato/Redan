@@ -102,7 +102,7 @@ pipeline → hard limits → bar:
 | Agents | `.claude/agents/*.md` |
 | Orchestration skills | `.claude/skills/{pentest-init,pentest,pentest-report,pentest-retest,pentest-qa}/SKILL.md` |
 | Reusable workflows | `.claude/workflows/{pentest-assess,qa-gate,plugin_cve_research,toolkit-consistency-audit}.js` — named, parameterized multi-agent workflows run by name: `Workflow({name:'pentest-assess', args:{target,engagement}})` (parallel vuln-class finders → opus verify), `Workflow({name:'qa-gate', args:{engagement}})` (5-lens pre-delivery audit → PASS/BLOCK), and `Workflow({name:'plugin_cve_research', args:{plugins:[{slug,name,version},...]}})` (systematic CVE research across NVD/Wordfence/Patchstack/WPScan for a plugin inventory — fills the OSV WordPress-coverage gap), and `Workflow({name:'toolkit-consistency-audit'})` (repo-wide consistency/drift audit — no engagement hardcoding, stale refs, doc-code drift). The committed, generalizable patterns; target-specific runs stay session-transient. |
-| Engagement template | `engagements/_template/{authorization.md,scope.yaml,leads.md,evidence/,roles.example.json,README.md}` (copied by `/pentest-init`) |
+| Engagement template | `engagements/_template/{authorization.md,scope.yaml,leads.md,evidence/,exploit-dev/,roles.example.json,README.md}` (copied by `/pentest-init`; `exploit-dev/` = the gated bespoke-PoC scaffold) |
 | Hooks | `.claude/hooks/{scope-gate.py,mutation-gate.py,session-start.sh}` (scope-gate = host allow/deny, **fail-CLOSED on missing scope for external hosts**, gates the request-issuing browser tools; mutation-gate = auth testing read-only by default) |
 | Rules | `.claude/rules/*.md` |
 | Tests / CI | `tests/{lab_server.py,test_*.py,run_all.py,README.md}` — offline 127.0.0.1 lab, **TP + FP-rejection per covered injection detector + the IDOR oracle** (plus import/compile smoke across all modules); `tools/checks/doctrine_lint.py` = deterministic self-audit of kit-vs-rules adherence. `python tests/run_all.py`; CI: `.github/workflows/tests.yml`. |
@@ -113,7 +113,7 @@ pipeline → hard limits → bar:
 | Coverage-depth + scale | `tools/checks/{crawler,js_secrets,graphql_probe,xxe_probe,deser_detect,smuggle_probe,sri_check,header_probe,cors_probe,jwt_probe,multi_target}.py` — same-origin spider (forms/params/JS-endpoints); JS-bundle secret scan; **sri_check** (third-party-JS Subresource-Integrity / supply-chain — missing-SRI + no-CSP + cookie-reading-script exposure); **header_probe** (host-header / CRLF / method-override / open-redirect battery, each with a control); **cors_probe** (reflected-Origin + Allow-Credentials CORS, CWE-942); **jwt_probe** (JWT analyzer + offline weak-secret crack + active forge — alg:none / claim-escalation / RS→HS key-confusion, each paired with a wrong-sig control); GraphQL introspection; XXE battery + built-in OOB collaborator; deserialization-sink + request-smuggling detection (lead-only, honest ceilings); and a multi-target deterministic triage sweep for enterprise scope. Mostly core-scaled — the recon/discovery tools fan to ~cores×4 via `_concurrency.py`; the param-driven probes use a fixed default (override with `--concurrency`). Hard-class tools flag leads for the verifier. (header_probe/sri_check are ACTIVE — not in recon_sweep; web-tester runs them. The param-driven probes cmd_inject/ssti_probe/nosql_probe/xss_scan are likewise ACTIVE and web-tester-run; urllib is blind through a JS-challenge WAF — re-test positives via the browser.) |
 | Edge / WAF + bypass recon | `tools/checks/waf_detect.py` — **run FIRST** against an edge-protected target: detects a JS proof-of-work challenge (Imunify360/Cloudflare-class) and routes the testing **channel** (`js-challenge` ⇒ urllib/curl tools are blind → use the **browser agents**, which solve the challenge like a real attacker's headless Chrome). `origin_discover.py` — WAF-bypass recon (find a directly-reachable origin IP = a finding). See `pitfalls.md` "WAF/challenge shell" + `/pentest` recon routing. |
 | Report renderer | `tools/report-render/{render_report.py,export.py,report.css,report-light.css,README.md}` — **findings.json (single source) → report.md + report.html (dark)** via `--all` (dark is the default; light/print theme opt-in via `--theme light`; dark survives PDF via a `@media print` block). **report.html is a STANDALONE deliverable**: CSS inlined **and the referenced evidence embedded inline** (text in collapsible `<details>`, screenshots as base64) so a client with only that file has the full evidence; per-finding bullets link to the appendix block; embedded text is redaction-neutralized on the way in (the render-time chokepoint); oversized artifacts truncated/noted; `--no-embed-evidence` opts out. **Standards-aligned:** per-finding `owasp`/`wstg`/`attack` tags + engagement `asvs_level`/`coverage[]`/`limitations[]`/`compliance` render as report **§4 "Standards coverage & limitations"** (WSTG/ASVS/API coverage matrix). **`export.py` → SARIF 2.1.0 / Jira-CSV / DefectDojo** for vuln-mgmt ingestion (redaction chokepoint). Dark-glass visual treatment, re-keyed to pentest severity. |
-| Per-engagement files | `engagements/<name>/{authorization.md,scope.yaml,evidence/,leads.md,findings.json,report.md,report.html,report-light.html,report-light.pdf}` — `report.*` GENERATED from `findings.json`; never hand-edit them |
+| Per-engagement files | `engagements/<name>/{authorization.md,scope.yaml,evidence/,exploit-dev/,leads.md,findings.json,report.md,report.html,report-light.html,report-light.pdf}` — `report.*` GENERATED from `findings.json` (never hand-edit); `exploit-dev/` = gated bespoke-PoC scratch (gitignored, exploiter-only) |
 
 `engagements/` holds real target data and is **gitignored** except the template.
 
@@ -172,7 +172,19 @@ opus) → **`exploiter`** (chain-synthesis, opus, `mutation_testing`-gated) → 
 ### The chain-exploitation layer
 The `exploiter` agent (post-verifier, pre-reporter) composes confirmed primitives into end-to-end
 chains (JWT-forge→ATO, SSRF→metadata reach, gadget pingback, gated SQLi extraction, IDOR scale)
-at their chain severity, with OOB confirmation (`oob.py`). Wired as `/pentest` Phase 3.5.
+at their chain severity, with OOB confirmation (`oob.py`). Wired as `/pentest` Phase 3.5. When a
+primitive/lead needs **bespoke exploit code no fixed probe covers** (custom signature gate,
+app-specific logic flaw, odd serialization), the same agent opens the **exploit-dev lane** — a
+one-off PoC under the gitignored `engagements/<name>/exploit-dev/` (copied from
+`_template/exploit-dev/_poc_template.py`: a `control()`/`exploit()` delta that emits a `replay.py`
+transcript and prints a LEAD). **Gated two ways** — `mutation-gate.py` hard-denies an
+`exploit-dev/*.py` run unless `mutation_testing: approved` (the PoC path is on the command line;
+its target/verbs are inside the .py, unseen by the host/verb scan), AND the scaffold's `_kit()`
+self-checks fail-closed (approved + request host `in_scope`); same RoE (lifts nothing). A PoC
+self-asserting success is a LEAD until the verifier reproduces the effect
+by replay/re-derivation — never by re-running the script (`evidence-standard.md` → Bespoke-PoC
+reproduction; `pitfalls.md` → "A PoC that prints SUCCESS"). Guarded by `doctrine_lint` C11 (no real
+engagement data, incl. bespoke PoCs, may be git-tracked).
 
 ### Reporting + QA gate
 Single-source `findings.json` → `report.md` + dark/light HTML + PDF (standalone: CSS + evidence

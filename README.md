@@ -3,7 +3,7 @@
 <p align="center"><em>A multi-agent web pentest toolkit for Claude Code — every finding is independently verified and QA-gated.</em></p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-v0.7.0-blue.svg" alt="Version: v0.7.0">
+  <img src="https://img.shields.io/badge/version-v0.8.0-blue.svg" alt="Version: v0.8.0">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/core-stdlib--only-success.svg" alt="Core: stdlib-only">
@@ -69,7 +69,7 @@ scope.yaml -> /pentest -> recon · web-tester · auth-tester · cloud-iam
 - **75 stdlib modules** (`tools/checks/`, stdlib-only, JSON) — recon, active testing (injection, XSS, SSRF, access control, request smuggling, file upload, SOAP/XXE, rate limiting, JWT, AI/LLM surface, …), visual triage, authenticated testing, edge-egress rotation, and reporting. Full catalog: [`tools/checks/README.md`](tools/checks/README.md).
 - **Tested + self-auditing** — a committed [`tests/`](tests/) suite (offline 127.0.0.1 lab, **true-positive AND false-positive-rejection** per covered injection detector + the authed IDOR oracle, plus broad import/compile smoke across all modules) plus a deterministic **doctrine self-audit** (`tools/checks/doctrine_lint.py`) that scans the kit's own adherence to [`.claude/rules/`](.claude/rules/). Both gate CI ([`.github/workflows/tests.yml`](.github/workflows/tests.yml)). Run locally: `python tests/run_all.py`.
 - **Edge-egress rotation** — `proxy_rotate.py` sources free public HTTP proxies to beat per-IP graylists; `browser_probe.py --proxy` routes headless Chromium through them to solve JS proof-of-work challenges (beats BOTH an Imunify360 graylist AND its JS PoW — no Tor required).
-- **Chain exploitation** — the `exploiter` combines confirmed issues into full attack chains (JWT-forge→account takeover, SSRF→internal metadata, IDOR at scale).
+- **Chain exploitation** — the `exploiter` combines confirmed issues into full attack chains (JWT-forge→account takeover, SSRF→internal metadata, IDOR at scale). When a lead needs bespoke exploit code no fixed probe covers, it opens a gated, captured **exploit-dev lane** (one-off PoC under a gitignored scratch dir) — a LEAD until the verifier independently reproduces it. Both are off unless `mutation_testing: approved` + an authorization basis.
 - **Reporting** — `findings.json` → `report.md` + standalone HTML (CSS + evidence inlined — one file, no loose artifacts) + PDF. Per-finding OWASP/WSTG/ATT&CK + CVSS/CWE. Export → SARIF / Jira / DefectDojo.
 - **QA gate** — mechanical pre-flight (`finding_schema` + `redact`) → 5-lens panel → `PASS`/`BLOCK`.
 - **Finding lifecycle / retest** — `finding_ledger` tracks each finding by a stable `finding_uid` across engagements; `/pentest-retest` renders a **fixed / still-open / new / regressed** delta (verify-the-fix + regression) into the report.

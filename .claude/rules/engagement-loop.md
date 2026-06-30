@@ -66,6 +66,12 @@ next probe for the *new* localization.
 - **Automatable (partial):** re-run step 3 with the updated hypothesis pair; the
   *choice* of next splitter is the creative/human part, the "name two
   hypotheses, find the divergent request" is the guardrail.
+- **Bespoke exploit-angle (gated):** when the redirect lands on a surface no fixed
+  probe reaches (custom signature gate, app-specific logic flaw), the `exploiter`'s
+  **exploit-dev lane** is the substrate for authoring the one-off PoC — gated for
+  exactly the reason this step is judgment-heavy (`scope.yaml: mutation_testing:
+  approved` + an authorization basis). Fixed probe first; the lane only for the
+  genuinely uncovered. See `.claude/agents/exploiter.md`.
 
 ### 5. Lock predictions, build the falsification IN
 Before running the confirming exploit, write what you expect **if real** vs **if
