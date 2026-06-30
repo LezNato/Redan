@@ -128,7 +128,7 @@ pipeline → hard limits → bar:
 
 ## Current state
 
-A comprehensive web-only black-box pentest ensemble: **74 stdlib modules**, **8 agents**, a
+A comprehensive web-only black-box pentest ensemble: **75 stdlib modules**, **8 agents**, a
 **chain-exploitation layer**, edge-egress rotation (proxy + browser channel for
 WAF'd/graylisted targets), independent verification, and a QA-gated single-source
 reporting pipeline. Proven on real engagements (including a WAF'd WordPress site and a React/ASP.NET SPA) +
@@ -138,11 +138,12 @@ oracle, plus import/compile smoke across all modules) and a deterministic **doct
 self-audit** (`tools/checks/doctrine_lint.py`) gate the kit in CI
 (`.github/workflows/tests.yml`) against drift from its own discipline.
 
-### Tooling (`tools/checks/` (74 stdlib modules) + `tools/report-render/`)
+### Tooling (`tools/checks/` (75 stdlib modules) + `tools/report-render/`)
 **Recon**: `http_headers`, `tls_check`, `dns_email` (+CAA/DNSSEC), `wp_fingerprint`, `path_probe`,
 `port_scan`, `recon_sweep` (concurrent), `host_intel` (Shodan passive), `wayback_recon` (CDX), `subdomain_enum` (subfinder-style multi-source passive + wordlist brute), `proxy_rotate` (free-proxy egress rotation when an edge graylists your IP),
 `waf_detect` (JS-challenge routing), `origin_discover`, `multi_target`, `health_check` (prod safety),
-`framework_fingerprint` (active server-framework ID — whatweb-style, beyond the `Server:` banner).
+`framework_fingerprint` (active server-framework ID — whatweb-style, beyond the `Server:` banner),
+`screenshot_gallery` (bulk headless-Chromium screenshot triage → HTML gallery; dead host = no shot, not a blank).
 **Active testing**: `fuzzer`, `crawler`, `js_secrets`, `js_routes` (deep JS), `sri_check`
 (supply-chain), `header_probe` (host-header/CRLF/method/redirect), `cors_probe` (CWE-942),
 `jwt_probe` (analyzer + offline crack + active forge), `clickjack_probe`, `waf_bypass` (variant battery), `websocket_probe`

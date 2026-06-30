@@ -4,6 +4,31 @@ All notable changes to Redan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/). Versions are git-tagged (`vX.Y.Z`).
 
+## [0.7.0] — 2026-07-01
+
+*Bulk screenshot triage.* New recon/triage tool, backward-compatible. 74 → **75 stdlib modules**.
+
+### Added
+- **`tools/checks/screenshot_gallery.py`** — bulk web-page screenshot triage
+  (gowitness/aquatone-style): renders a list of targets in headless Chromium (reuses
+  the `browser_probe` Playwright channel) and writes a single **HTML gallery**
+  (thumbnail + HTTP status + page title + final URL per target) for fast visual triage
+  of a large web surface — the "which of these hosts is a login page / default install
+  / admin panel" pass a status code can't answer. A capture tool (no disposition); a
+  DEAD host produces an error row and **NO** screenshot — never a blank/fake thumbnail
+  (the recon analogue of the kit's false-positive discipline). Sequential + RoE-gentle
+  (one GET render per target); bare hosts try https then http; lazy Playwright import
+  (import-smoke safe). Web-app scope.
+- **`tests/test_screenshot_gallery.py`** — TP (a live lab page captured: HTTP 200 + a
+  real PNG on disk) + FP-rejection (a dead host = error row, NO screenshot) + the
+  gallery is written. Browser-dependent, so it SKIPS cleanly when chromium is
+  unavailable (CI is stdlib-only/offline) and runs for real locally.
+
+### Changed
+- Docs — `screenshot_gallery` added to the `tools/checks/README.md` catalog + the
+  CLAUDE.md / README inventories (75-module count). Settled out-of-lane recon
+  (repo-secret OSINT, multi-engine host search) remains deliberately unbuilt.
+
 ## [0.6.0] — 2026-06-30
 
 *`llm_probe` depth — black-box AI/LLM attack techniques.* Enhances an existing tool;
@@ -236,6 +261,7 @@ modules** (68 → 72).
 chain-exploitation layer, independent verification, and a QA-gated single-source
 reporting pipeline. Proven on real engagements.
 
+[0.7.0]: https://github.com/LezNato/Redan/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/LezNato/Redan/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/LezNato/Redan/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/LezNato/Redan/compare/v0.4.1...v0.4.2
