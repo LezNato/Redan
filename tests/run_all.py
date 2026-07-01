@@ -4,6 +4,10 @@
 Stdlib only, no network: each suite spins up a local 127.0.0.1 lab or tests pure
 functions. This is the gate CI runs (see .github/workflows/tests.yml) and the one
 command to run locally before a commit:  python tests/run_all.py
+
+  --no-lint   skip the doctrine_lint self-audit (CI runs it as a SEPARATE step so a
+              lint failure is distinguishable from a test failure in the red X; the
+              default local run still includes it).
 """
 import glob
 import os
@@ -20,8 +24,10 @@ def run(label, argv):
 
 
 def main():
-    results = [("doctrine_lint (self-audit)",
-                run("doctrine_lint", [sys.executable, "tools/checks/doctrine_lint.py"]))]
+    results = []
+    if "--no-lint" not in sys.argv:  # CI runs doctrine_lint as its own step (see tests.yml)
+        results.append(("doctrine_lint (self-audit)",
+                        run("doctrine_lint", [sys.executable, "tools/checks/doctrine_lint.py"])))
     for t in sorted(glob.glob(os.path.join(HERE, "test_*.py"))):
         name = os.path.basename(t)
         results.append((name, run(name, [sys.executable, t])))

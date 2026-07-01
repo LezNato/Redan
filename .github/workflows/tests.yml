@@ -14,8 +14,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      # The toolkit is stdlib-only and the suite is offline (local 127.0.0.1 lab),
-      # so there is nothing to install. run_all.py runs the doctrine self-audit
-      # (tools/checks/doctrine_lint.py) + every tests/test_*.py.
-      - name: Doctrine self-audit + test suite
-        run: python tests/run_all.py
+      # The toolkit is stdlib-only and the suite is offline (local 127.0.0.1 lab), so
+      # there is nothing to install. The doctrine self-audit and the test suite run as
+      # SEPARATE steps so a red check is self-explanatory (lint drift vs a test failure).
+      - name: Doctrine self-audit (doctrine_lint C1-C12)
+        run: python tools/checks/doctrine_lint.py
+      - name: Test suite (tests/test_*.py)
+        run: python tests/run_all.py --no-lint

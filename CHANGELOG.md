@@ -4,6 +4,17 @@ All notable changes to Redan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/). Versions are git-tagged (`vX.Y.Z`).
 
+## [0.9.2] — 2026-07-01
+
+*CI clarity — the doctrine self-audit runs as its own step.* Patch — no toolkit change; still
+**75 stdlib modules**.
+
+### Changed
+- **CI (`tests.yml`) now runs the doctrine self-audit (`doctrine_lint` C1–C12) and the test suite
+  as SEPARATE steps**, so a red check is self-explanatory — lint/doc drift vs an actual test
+  failure — instead of both hiding behind one job. `run_all.py` gains `--no-lint` (CI runs the lint
+  as its own step; the default local `python tests/run_all.py` is unchanged and still includes it).
+
 ## [0.9.1] — 2026-07-01
 
 *CI-green fix + v0.9.0 coherence-audit stragglers.* Patch — no interface change; still **75
@@ -375,6 +386,7 @@ modules** (68 → 72).
 chain-exploitation layer, independent verification, and a QA-gated single-source
 reporting pipeline. Proven on real engagements.
 
+[0.9.2]: https://github.com/LezNato/Redan/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/LezNato/Redan/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/LezNato/Redan/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/LezNato/Redan/compare/v0.7.0...v0.8.0
