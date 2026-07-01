@@ -458,7 +458,8 @@ def render_html(d, css, embed=None):
         s = rt.get("summary", {})
         def _rt_rows(items):
             return "".join(f'<li><code>{e(x.get("uid",""))}</code> — {e(x.get("title",""))} '
-                           f'<span class="exec__pill sev--{sev_class(x.get("severity"))}">{e(x.get("severity",""))}</span></li>'
+                           f'<span class="exec__pill sev--{sev_class(x.get("severity"))}">{e(x.get("severity",""))}</span>'
+                           f'{(" — <em>" + e(x.get("verified")) + "</em>") if x.get("verified") else ""}</li>'
                            for x in (items or []))
         _blocks = ""
         for _lbl, _k, _note in [("Regressed", "regressed", "previously fixed, now back — priority"),
@@ -470,12 +471,13 @@ def render_html(d, css, embed=None):
                 _blocks += (f'<div class="block"><h4>{_lbl} ({len(_items)}) '
                             f'<span class="exec__hint">{_note}</span></h4><ul>{_rt_rows(_items)}</ul></div>')
         _date = f' (re-tested {e(rt["date"])})' if rt.get("date") else ""
+        _note_html = f'<p class="card__note">{e(rt["note"])}</p>' if rt.get("note") else ""
         retest_html = (f'<article class="card card--info"><div class="card__head"><div>'
             f'<p class="card__kicker">Retest</p><h2 class="card__title">Retest / remediation delta{_date}</h2></div></div>'
             f'<div class="card__meta"><span><b>Fixed:</b> {s.get("fixed",0)}</span>'
             f'<span><b>Still open:</b> {s.get("still_open",0)}</span>'
             f'<span><b>New:</b> {s.get("new",0)}</span>'
-            f'<span><b>Regressed:</b> {s.get("regressed",0)}</span></div>{_blocks}</article>')
+            f'<span><b>Regressed:</b> {s.get("regressed",0)}</span></div>{_note_html}{_blocks}</article>')
     classification = eng.get("classification")  # declared handling label — NOT defaulted; a report carries a confidentiality marking only when the engagement explicitly sets one
     classification_html = f'<span class="confidential">{e(classification)}</span>' if classification else ""
     evidence_note = ("Evidence artifacts are embedded inline above (secrets/PII redacted) so this file is self-contained."
@@ -588,10 +590,13 @@ def render_retest_md(rt):
          f"| Still open (persisted) | {s.get('still_open',0)} |",
          f"| New (first seen this test) | {s.get('new',0)} |",
          f"| Regressed (was fixed, returned — priority) | {s.get('regressed',0)} |", ""]
+    if rt.get("note"):
+        L += [f"> {rt['note']}", ""]
     def lst(title, items):
         if not items:
             return []
-        return [f"**{title}:**", ""] + [f"- `{x.get('uid','')}` — {x.get('title','')} ({x.get('severity','')})" for x in items] + [""]
+        return [f"**{title}:**", ""] + [f"- `{x.get('uid','')}` — {x.get('title','')} ({x.get('severity','')})"
+                                        + (f" — _{x['verified']}_" if x.get('verified') else "") for x in items] + [""]
     L += lst("Regressed (priority — a previously-fixed issue is back)", rt.get("regressed"))
     L += lst("Still open", rt.get("still_open"))
     L += lst("Fixed", rt.get("fixed"))

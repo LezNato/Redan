@@ -4,6 +4,19 @@ All notable changes to Redan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/). Versions are git-tagged (`vX.Y.Z`).
 
+## [0.11.1] — 2026-07-01
+
+*Retest rendering — partial-retest coverage honesty in the report delta.* Patch — no new module;
+still **78 stdlib modules**.
+
+### Changed
+- **`render_report.py` renders an optional retest `note` + per-item `verified` marker** in the
+  "Retest / remediation delta" section (md + html). A partial *verify-the-fix* re-test can now state,
+  adjacent to the delta table, which findings were LIVE re-verified vs carried forward — so
+  "still open" (a not-remediated lifecycle label) is never misread as an affirmative re-verification
+  claim. Backward-compatible (renders only when the `retest` block carries the fields). Prompted by
+  the `qa-gate` panel flagging exactly that ambiguity on a real partial re-test.
+
 ## [0.11.0] — 2026-07-01
 
 *Business-process oracle — the intended-behavior model black-box logic/authz testing lacks.*
