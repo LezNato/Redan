@@ -3,7 +3,7 @@
 <p align="center"><em>A multi-agent web pentest toolkit for Claude Code — every finding is independently verified and QA-gated.</em></p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-v0.9.0-blue.svg" alt="Version: v0.9.0">
+  <img src="https://img.shields.io/badge/version-v0.9.1-blue.svg" alt="Version: v0.9.1">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/core-stdlib--only-success.svg" alt="Core: stdlib-only">

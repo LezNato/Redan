@@ -4,6 +4,32 @@ All notable changes to Redan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/). Versions are git-tagged (`vX.Y.Z`).
 
+## [0.9.1] — 2026-07-01
+
+*CI-green fix + v0.9.0 coherence-audit stragglers.* Patch — no interface change; still **75
+stdlib modules**.
+
+### Fixed
+- **CI had been RED since v0.5.0** — `doctrine_lint` **C3** (rule .md cross-refs) walked the whole
+  tree for `.md` files, including the **gitignored `engagements/<name>/report.md`** artifacts present
+  on a dev box. So a rule's reference to the generated `report.md` resolved locally but **failed on a
+  clean CI checkout** (no engagement folders) → `run_all` failed every push, while local runs passed.
+  C3 now resolves refs against **committed files only** — `_existing_md()` prunes the engagement dirs
+  (only `_template` survives) and `report.md` is allowlisted as a generated artifact. **Local now
+  matches CI.** (Surfaced by the operator noticing the red tag checks; the local-masks-CI class is the
+  exact discipline gap the kit exists to close.)
+- **v0.9.0 coherence-audit stragglers** (a 5-lens repo audit): a hardcoded real engagement slug
+  removed from `run_manifest.py` + a test fixture (now `<name>`/fictional); a stale `doctrine_lint`
+  range `C1–C10` corrected to **C1–C12** in `CLAUDE.md` / `CONTRIBUTING.md` / `tests/README.md`; a
+  stale `(76)` module count dropped from `tests/README.md` (the smoke test prints the real count).
+
+### Added
+- **`doctrine_lint` C12** — no COMMITTED file may hardcode a concrete engagement slug
+  (`engagements/<slug>/` or `--engagement <slug>`): a real-target-name leak guard (the
+  public-release scrub discipline), turning the audit's manual catch into a mechanical gate.
+  Kebab-lowercase-only with a unit-tested pure helper (`tests/test_doctrine_lint.py` check (i));
+  the check's own source + fixtures are exempt. (12 checks now gate the kit.)
+
 ## [0.9.0] — 2026-07-01
 
 *`llm_probe` depth — multi-turn/Crescendo + indirect (data-channel) injection.* Enhances an
@@ -349,6 +375,7 @@ modules** (68 → 72).
 chain-exploitation layer, independent verification, and a QA-gated single-source
 reporting pipeline. Proven on real engagements.
 
+[0.9.1]: https://github.com/LezNato/Redan/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/LezNato/Redan/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/LezNato/Redan/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/LezNato/Redan/compare/v0.6.0...v0.7.0

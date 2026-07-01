@@ -78,13 +78,24 @@ def main():
 
     # (h) C11 leak-guard: a tracked engagement file OUTSIDE _template is a leak; the
     #     committed template (incl. its exploit-dev scaffold) and .gitkeep are not.
-    leak = ["engagements/glnet/evidence/cap.txt", "engagements/acme/exploit-dev/poc_1.py"]
+    leak = ["engagements/example/evidence/cap.txt", "engagements/acme/exploit-dev/poc_1.py"]
     safe = ["engagements/_template/scope.yaml",
             "engagements/_template/exploit-dev/_poc_template.py", "engagements/.gitkeep"]
     rec("C11 flags tracked real-engagement data", doctrine_lint._engagement_leaks(leak) == sorted(leak),
         str(doctrine_lint._engagement_leaks(leak)))
     rec("C11 ignores _template + .gitkeep", doctrine_lint._engagement_leaks(safe) == [],
         str(doctrine_lint._engagement_leaks(safe)))
+
+    # (i) C12 slug-leak matcher: flags a real kebab-lowercase slug (path or --engagement flag),
+    #     ignores <name>/<slug> + _template placeholders, single-letter arg placeholders (E/x),
+    #     prose stopwords after --engagement, and the neutral fixtures.
+    hs = doctrine_lint._hardcoded_slugs
+    rec("C12 flags a real slug (path + flag)",
+        hs("see engagements/victimco/evidence/x then run --engagement realclient now") == ["realclient", "victimco"],
+        str(hs("see engagements/victimco/evidence/x then run --engagement realclient now")))
+    rec("C12 ignores placeholders / prose / fixtures", hs(
+        "engagements/<name>/ --engagement E --engagement and engagements/acme/ engagements/x/ engagements/_template/") == [],
+        str(hs("engagements/<name>/ --engagement E --engagement and engagements/acme/ engagements/x/ engagements/_template/")))
 
     npass = sum(CHECKS)
     print(f"\n{npass}/{len(CHECKS)} checks passed")

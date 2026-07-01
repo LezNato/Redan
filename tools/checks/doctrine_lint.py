@@ -28,6 +28,12 @@ Checks:
       .gitkeep) may be committed; everything else under engagements/ (evidence, bespoke
       exploit-dev PoCs, findings) must stay gitignored. A target-data leak guard for the
       blanket `engagements/*` ignore (the exploit-dev lane makes target-specific PoCs easy).
+  C12 no COMMITTED file hardcodes a concrete engagement slug (engagements/<slug>/ or
+      --engagement <slug>) — that leaks a real target name (scrub discipline). Placeholders
+      (<name>/<slug>) and neutral fixtures (example/acme/test) are fine.
+
+Note: C3 resolves .md refs against COMMITTED files only — _existing_md() prunes the gitignored
+engagements/<name>/ dirs so a local report.md can't mask a missing ref on a clean CI checkout.
 
 Usage: python tools/checks/doctrine_lint.py            # exit 1 on any violation
 """
@@ -113,14 +119,27 @@ def c2_redact_coverage():
 
 
 def _existing_md():
+    """Every committed .md filename (lower-cased). Prunes .git and REAL engagement dirs:
+    engagements/<name>/ is gitignored — present on a dev box, ABSENT on a clean CI checkout.
+    Walking them let a local engagements/<name>/report.md MASK a genuinely-missing ref, so C3
+    passed locally but failed on CI (the divergence that kept CI red). Only _template survives."""
     found = set()
-    for d, _, fs in os.walk(REPO):
+    for d, dirs, fs in os.walk(REPO):
         if ".git" in d:
+            dirs[:] = []
             continue
+        if os.path.relpath(d, REPO).replace("\\", "/") == "engagements":
+            dirs[:] = [x for x in dirs if x == "_template"]
         for f in fs:
             if f.endswith(".md"):
                 found.add(f.lower())
     return found
+
+
+# .md filenames the rules reference by canonical name but which are GENERATED per engagement
+# under gitignored engagements/<name>/ (absent on a clean tree / CI) — referencing them is
+# correct, so C3 must not flag them missing. (report.html etc. aren't .md, so never reach C3.)
+_GENERATED_MD = {"report.md"}
 
 
 def c3_rule_md_refs():
@@ -131,8 +150,9 @@ def c3_rule_md_refs():
             continue
         text = open(os.path.join(RULES, f), encoding="utf-8").read()
         for ref in set(re.findall(r"\b([A-Za-z0-9][\w\-]*\.md)\b", text)):
-            if ref.lower() not in existing:
-                violations.append(f".claude/rules/{f}: references '{ref}' which does not exist")
+            if ref.lower() in _GENERATED_MD or ref.lower() in existing:
+                continue
+            violations.append(f".claude/rules/{f}: references '{ref}' which does not exist")
     return violations
 
 
@@ -304,6 +324,53 @@ def c11_engagement_data_untracked():
             for rel in _engagement_leaks(out.split("\n"))]
 
 
+# A CONCRETE engagement slug in a committed file leaks a real target name (the scrub
+# discipline). Matches engagements/<slug>/ paths AND --engagement <slug> flags; angle-bracket
+# placeholders (<name>/<slug>) and engagements/_template naturally don't match (the leading
+# charclass excludes '<' and '_'). A REAL slug is kebab-lowercase >=2 chars (pentest-init
+# mandates kebab-case) — so single-letter arg placeholders (E/A/V/x) and prose stopwords are
+# filtered out; the neutral fixtures + those stopwords are allowlisted. This file and its test
+# necessarily carry example slugs, so they are exempt (do not lint the linter's own fixtures).
+_ENG_SLUG = re.compile(r"engagements/([A-Za-z0-9][\w.-]*)/|--engagement[ =]([A-Za-z0-9][\w.-]*)")
+_ENG_SLUG_REAL = re.compile(r"[a-z0-9][a-z0-9._-]+")  # kebab-lowercase, >=2 chars
+_ENG_ALLOW = {"example", "acme", "test", "name", "slug", "and", "or", "none", "the"}
+_C12_EXEMPT = {"tools/checks/doctrine_lint.py", "tests/test_doctrine_lint.py"}
+
+
+def _hardcoded_slugs(text):
+    """The concrete real-slug leaks in a text blob (pure — unit-testable). Filters out the
+    <name>/<slug> / _template placeholders (regex-excluded), single-letter arg placeholders
+    (E/A/V/x), prose stopwords, and the neutral fixtures."""
+    slugs = {(m.group(1) or m.group(2)) for m in _ENG_SLUG.finditer(text)}
+    return sorted(s for s in slugs if s and s not in _ENG_ALLOW and _ENG_SLUG_REAL.fullmatch(s))
+
+
+def c12_no_hardcoded_engagement_slug():
+    """No COMMITTED file may reference a concrete engagement slug — that leaks a real target name
+    (public-release scrub discipline). Turns the audit's manual glnet-leak catch into a mechanical
+    guard. Scans tracked text files; skips if no git."""
+    try:
+        out = subprocess.run(["git", "ls-files"], cwd=REPO, capture_output=True,
+                             text=True, timeout=30).stdout
+    except Exception:
+        return []  # no git -> skip
+    violations = []
+    for rel in sorted({f.strip() for f in out.split("\n") if f.strip()}):
+        if rel.replace("\\", "/") in _C12_EXEMPT:
+            continue  # the check's own source + fixtures carry deliberate example slugs
+        p = os.path.join(REPO, rel)
+        if not os.path.isfile(p):
+            continue
+        try:
+            text = open(p, encoding="utf-8").read()
+        except (UnicodeDecodeError, OSError):
+            continue  # binary / unreadable
+        for slug in _hardcoded_slugs(text):
+            violations.append(f"{rel}: hardcodes concrete engagement slug '{slug}' — use an "
+                              f"<name>/<slug> placeholder (real-target-name leak; scrub discipline)")
+    return violations
+
+
 CHECK_FNS = [
     ("C1 no-hard-CONFIRMED verdicts", c1_no_hard_confirmed),
     ("C2 redact covers QA-gate classes", c2_redact_coverage),
@@ -316,6 +383,7 @@ CHECK_FNS = [
     ("C9 stated module count is accurate", c9_module_count),
     ("C10 redaction refuse uses categorized secret hits", c10_redaction_refuse_categorized),
     ("C11 engagement data is untracked", c11_engagement_data_untracked),
+    ("C12 no hardcoded engagement slug", c12_no_hardcoded_engagement_slug),
 ]
 
 

@@ -26,13 +26,13 @@ CI: `.github/workflows/tests.yml` runs `run_all.py` on every push/PR.
 | `test_export.py` | `export.py` populates Description from the canonical `description` field, includes reproduction, and **blocks** on credential material. |
 | `test_tool_contract.py` | The `_result.py` output contract validates, and the disposition-emitting probes conform (`tool`/`target`/`ok`/valid `disposition`). |
 | `test_run_manifest.py` | `run_manifest.py` wraps a tool run (enriched from the `_result` contract), records manual entries, and summarizes — the engagement audit trail. |
-| `test_tools_smoke.py` | Every tool module (76) compiles **and** imports cleanly — the breakage net that makes the incremental `_http.py` migration safe. |
+| `test_tools_smoke.py` | Every tool module compiles **and** imports cleanly (the count is printed at runtime) — the breakage net that makes the incremental `_http.py` migration safe. |
 | `test_auth_idor.py` | The authenticated 4-cell IDOR oracle (`auth_request --idor`): confirms IDOR on an ownership-free endpoint and rejects it on the ownership-enforced one, with seeded roles/sessions in a temp out-of-tree `PENTEST_AUTH_HOME`. |
 | `test_doctrine_lint.py` | The self-audit linter passes on the tree, **catches** a hard-`CONFIRMED` verdict, and honors the inline allow directive. |
 
 ## The doctrine linter
 
-`tools/checks/doctrine_lint.py` is a deterministic self-audit (C1–C10): no
+`tools/checks/doctrine_lint.py` is a deterministic self-audit (C1–C12): no
 single-signal `CONFIRMED` verdicts (C1), redaction coverage of the QA-gate classes
 (C2), resolvable rule cross-refs (C3), tool refs exist (C4), valid agent models
 (C5), schema completeness (C6), **the repo passes its own `redact` scan** (C7),

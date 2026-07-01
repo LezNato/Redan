@@ -22,7 +22,7 @@ proxy/channel guidance as browser_probe for graylisted/JS-challenge edges).
 
 Usage:
   python screenshot_gallery.py https://a.example https://b.example
-  python screenshot_gallery.py --list hosts.txt --out-dir engagements/x/evidence/shots
+  python screenshot_gallery.py --list hosts.txt --out-dir engagements/<name>/evidence/shots
   python screenshot_gallery.py --targets a.example,b.example --full-page --timeout 25000
 """
 import argparse

@@ -10,10 +10,10 @@ enriched with its tool/target/disposition.
 Modes:
   wrap   run a tool, record {ts,tool,target,exit,disposition,verdict,argv}, pass
          its stdout through unchanged:
-            python run_manifest.py wrap --engagement glnet -- \
+            python run_manifest.py wrap --engagement <name> -- \
                 python tools/checks/nosql_probe.py https://t/api --param user
   record append an explicit entry (for non-JSON tools / manual notes):
-            python run_manifest.py record --engagement glnet --tool burp \
+            python run_manifest.py record --engagement <name> --tool burp \
                 --target https://t --exit 0 --disposition lead --note "manual"
   show   summarize the manifest (counts by tool + disposition).
 

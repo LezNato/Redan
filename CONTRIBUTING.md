@@ -41,7 +41,7 @@ that wasn't updated in lockstep, not in the thing you changed. So:
 
 ## Testing
 - Run **`python tests/run_all.py`** before committing — it runs the doctrine self-audit
-  (`doctrine_lint.py` C1–C10) + every `tests/test_*.py`. This is what CI gates
+  (`doctrine_lint.py` C1–C12) + every `tests/test_*.py`. This is what CI gates
   ([`.github/workflows/tests.yml`](.github/workflows/tests.yml)).
 - `redact.py scan` (no credential leaks) and the import/compile smoke run inside it.
 - Stage specific files, never `git add -A`.
