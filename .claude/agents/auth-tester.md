@@ -56,6 +56,12 @@ share/order/payment/webhook) are OFF-LIMITS to trigger.
   low-priv role getting the **same privileged result/effect** (not just a 200),
   AND the entitlement model says it should be denied. A bare 200 from `/admin/...`
   is reachability, not a bypass.
+- If `engagements/<name>/business_process_map.json` carries an `expected_authz`
+  matrix, walk each **expected-deny** cell (role × path) and confirm the app denies
+  it — a 2xx where the matrix says deny is the lead (rely on the matrix only when
+  the map is `provisional:false`; a skeleton's anon column is observed, its intent
+  unconfirmed). This is the authenticated complement to `roles.json` (which already
+  encodes owned_objects/authz_model).
 
 ## Account safety
 Reuse saved sessions (don't re-login when liveness passes). On `429`/lockout

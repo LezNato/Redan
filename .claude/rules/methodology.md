@@ -26,6 +26,21 @@ until the **verifier** has tried to refute them.
    are authorized. If scope is empty/placeholder, STOP and ask the operator.
 2. **Recon (passive surface).** `recon` agent: subdomains, DNS, tech
    fingerprint, exposed surface, public artifacts. No active exploitation.
+2.5. **Model — the intended-behavior oracle (stateful/multi-role apps).** For an app with
+   real multi-step flows or multiple roles (checkout, banking, multi-tenant SaaS, the account
+   lifecycle), the `recon` agent runs `flow_map.py <base>` to build the OBSERVED skeleton — the
+   flows, an anonymous access matrix, and candidate invariants — then **transforms** it into
+   the intended shape (fill the documented invariants per flow + the role×endpoint
+   expected-allow/deny matrix `expected_authz`, set `provisional:false`) as
+   `engagements/<name>/business_process_map.json`.
+   This is the **oracle** the logic + access-control testing (phase 3) tests against and the
+   `verifier` (phase 4) judges *"is this diff a real violation?"* against — it turns `flow_probe`'s
+   "the server accepted quantity=-1" into a finding only when -1 breaks a **documented** rule
+   (`pitfalls.md`: accepted-value ≠ bug). For an **authenticated** engagement the authz half already
+   exists in `roles.json` (authz_model/owned_objects); the map fills the **black-box/unauthenticated**
+   gap where the client provides no roles.json. Skip it for a thin API / static marketing site where
+   `flow_probe` alone suffices — and **state that as a scoping choice** (`tradecraft-doctrine.md` §3),
+   don't silently omit it. See `engagements/_template/business_process_map.example.json` for the shape.
 3. **Enumeration + testing (active, in parallel by domain):**
    - `web-tester`: auth/session, access control (IDOR/BOLA), injection, SSRF,
      misconfig, secrets in responses. Uses the browser + Playwright tools.
@@ -134,7 +149,9 @@ The dispatch is a starting point, not a checklist — follow the redirects.
 | CSP header present but bypassable (`unsafe-inline`, `*`, JSONP/CDN allowlist, nonce + `unsafe-inline`) | Weak CSP (XSS viable, CWE-693) | `csp_probe.py` — directive analysis (the difference between "hardening OK" and "XSS exploitable here") |
 | GraphQL endpoint (beyond introspection) | Depth/cost, batching, field-suggestion | `graphql_adv.py` — `--depth` (cost), `--batch` (authz bypass), `--suggest` (schema brute) |
 | `/openapi.json` / `/swagger.json` exposed | API spec → per-operation fuzz | `openapi_probe.py` — type-confusion / enum-bypass / missing-required / extra-field per operation, baseline-diffed (LEAD) |
-| Multi-step flow (cart/coupon/checkout/payment) | Business-logic / workflow abuse | `flow_probe.py` — skip-step, field-tamper (qty/price/coupon), reorder + diff |
+| A stateful multi-step / multi-role app (checkout, banking, SaaS, account lifecycle) | Missing intended-behavior oracle (the black-box logic/authz gap) | `flow_map.py` — flow skeleton + anon access matrix + candidate invariants; the mapper annotates the DOCUMENTED intent into `business_process_map.json`, the oracle `flow_probe`/IDOR/access-control test against (a violation counts only vs a documented rule) |
+| Multi-step flow (cart/coupon/checkout/payment) | Business-logic / workflow abuse | `flow_probe.py` — skip-step, field-tamper (qty/price/coupon), reorder + diff (judge each diff against the `business_process_map.json` invariants) |
+| Signup / email-verification / password-reset / account-recovery flow | Account-lifecycle abuse, pre-auth (signup abuse, email-verification bypass, account pre-takeover) | model with `flow_map.py`, then test: register an already-registered email (pre-takeover), skip email-verification (does the account activate / can you log in pre-verify?), reset-token predictability/reuse/leakage — a step that SHOULD gate but doesn't = a lead |
 | Edge openresty/nginx + H2 default | HTTP/2 request smuggling | `h2_smuggle.py` (h2c, H2.CL timing) + `smuggle_probe.py` (H1 CL.TE/TE.CL) |
 | JWT in Authorization header | JWT attacks | `jwt_probe.py` — analyzer (alg:none/RS→HS/kid surfaces) + `--crack` (offline HS weak-secret) + `--attack-url` active forge (alg:none accept, claim-escalation, RS→HS key-confusion, cracked-secret forge), each forged variant paired with a wrong-sig control so acceptance is decisive (CWE-347) |
 | Cross-origin fetch + reflected ACAO + credentials | CORS misconfiguration | `cors_probe.py` — reflected arbitrary Origin + Allow-Credentials (CWE-942) |

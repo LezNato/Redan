@@ -41,6 +41,13 @@ Stay in scope; the gate applies to you too.
 4. **Rule out false positives.** Reflected input that isn't executed, a 200 that
    isn't actually unauthorized access, an "error" that's expected behavior,
    WAF-blocked payloads that look like success — call these out (see `pitfalls.md`).
+   For a **logic / access-control** candidate, judge it against
+   `engagements/<name>/business_process_map.json` if present: "the server accepted
+   X" is a finding only when X violates a **documented invariant**, and a 200 is a
+   finding only when the map's **expected_authz** says that path/identity should be
+   denied. Accepted-value ≠ bug, and 200 ≠ unauthorized, unless the oracle says so.
+   Treat the map as authority **only when its `provisional` is false** (mapper-confirmed
+   intent); a still-`provisional` skeleton is candidate structure — keep it a lead.
 5. **De-duplicate.** Same root cause as another finding, or a known/previously
    reported issue → mark duplicate.
 6. **Sanity-check severity.** Re-derive the CVSS vector from real impact. Reject

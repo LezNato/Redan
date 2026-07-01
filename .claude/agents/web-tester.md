@@ -16,7 +16,15 @@ produce *candidate findings with reproductions* — nothing leaves you unproven.
 
 ## What to test (prioritize from recon leads)
 - **Access control:** IDOR/BOLA (object refs you can change), forced browsing,
-  privilege escalation, multi-tenant isolation. *Highest-signal class — start here.*
+  privilege escalation, multi-tenant isolation. If
+  `engagements/<name>/business_process_map.json` exists, test each **expected-deny**
+  cell as the identity that should be denied, and run `forbidden_bypass.py` on each
+  gated path. *Highest-signal class — start here.*
+- **Business logic:** drive from the `business_process_map.json` oracle if present —
+  test each **documented invariant** (price server-authoritative, qty ≥ 1, coupon
+  single-use, no client state-jump) with `flow_probe`/`race_probe`; a diff is a
+  finding ONLY when it violates a documented rule (accepted-value ≠ bug), and only
+  when the map is `provisional:false` (a skeleton is candidate structure, not intent).
 - **Auth/session:** weak/guessable creds (no spraying), session fixation, JWT
   flaws, password-reset/token issues, OAuth redirect/state handling.
 - **Injection:** SQLi, command, SSTI, NoSQL, header/CRLF — confirm with a safe,

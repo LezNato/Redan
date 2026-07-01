@@ -1,0 +1,39 @@
+{
+  "_comment": "The ANNOTATED business-process + expected-authz oracle. flow_map.py emits the observed SKELETON (flows / anon access matrix / candidate invariants); the recon/mapper agent annotates the app's REAL intended behavior here. The logic + access-control lenses test each documented invariant + expected-authz cell; the verifier judges a diff a VIOLATION only against this intent (pitfalls.md: accepted-value != bug unless it breaks a rule stated here). Delete this example and write the real map to business_process_map.json; skip it entirely for a thin API / static site (state that as a scoping choice).",
+  "engagement": "<slug>",
+  "provisional": false,
+  "roles": ["anon", "user", "admin"],
+  "flows": [
+    {
+      "name": "checkout",
+      "steps": [
+        {"n": 1, "endpoint": "/cart", "method": "POST", "params": ["item", "qty"]},
+        {"n": 2, "endpoint": "/checkout", "method": "POST", "params": ["coupon"]},
+        {"n": 3, "endpoint": "/pay", "method": "POST", "params": ["token"]}
+      ],
+      "invariants": [
+        "price is server-authoritative — the client sends item id + qty, never the price",
+        "qty must be an integer >= 1",
+        "a coupon applies once per order and is not stackable",
+        "step 3 (/pay) requires steps 1-2 completed server-side (no skip-to-pay)"
+      ]
+    },
+    {
+      "name": "registration",
+      "steps": [
+        {"n": 1, "endpoint": "/register", "method": "POST", "params": ["email", "password"]},
+        {"n": 2, "endpoint": "/verify", "method": "GET", "params": ["token"]}
+      ],
+      "invariants": [
+        "an account is inactive until the emailed verification token is used (no login pre-verify)",
+        "registering an already-registered email must NOT take over / expose the existing account"
+      ]
+    }
+  ],
+  "expected_authz": [
+    {"path": "/admin/*",          "anon": "deny",  "user": "deny",            "admin": "allow"},
+    {"path": "/api/orders/{id}",  "anon": "deny",  "user": "allow-own-only",  "admin": "allow"},
+    {"path": "/account",          "anon": "deny",  "user": "allow-own-only",  "admin": "allow"},
+    {"path": "/",                 "anon": "allow", "user": "allow",           "admin": "allow"}
+  ]
+}

@@ -4,6 +4,39 @@ All notable changes to Redan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/). Versions are git-tagged (`vX.Y.Z`).
 
+## [0.11.0] — 2026-07-01
+
+*Business-process oracle — the intended-behavior model black-box logic/authz testing lacks.*
+Minor — **78 stdlib modules** (was 77).
+
+An architecture comparison (Redan's epistemic-role ensemble vs a proposed 12-role vuln-class
+decomposition) found ~11 of those roles relabel existing Redan capability, but ONE was a genuine
+gap: Redan has the business-logic PROBE (`flow_probe`) but nothing that produces the INTENDED-behavior
+model it must judge against ("the server accepted quantity=-1" is a finding only if -1 breaks a
+DOCUMENTED rule). This ships that oracle — as an artifact + phase, not a new agent.
+
+### Added
+- **`flow_map.py` — business-process + expected-authz oracle skeleton.** Deterministic: crawls
+  (reuses `crawler`) → multi-step **flows** (register/reset/verify/checkout), an **anonymous access
+  matrix** (path → gated/open/redirect + a sensitive heuristic), and **candidate invariants**
+  (param-name → the business rule it likely encodes + the test). Emits a PROVISIONAL skeleton the
+  recon/mapper agent annotates into `engagements/<name>/business_process_map.json` — the ORACLE the
+  `logic`/`access-control` lenses test against and the `verifier` judges "accepted-value ≠ bug / 200 ≠
+  unauthorized" against. Fills the black-box/unauthenticated gap (`roles.json` covers the authed side).
+  RoE-gentle (bounded crawl + capped anon probe). Structural test (`test_flow_map.py`).
+- **`engagements/_template/business_process_map.example.json`** — the annotated oracle shape (flows +
+  documented invariants + a role×endpoint expected-allow/deny matrix), scaffolded by `/pentest-init`.
+
+### Changed
+- **Methodology Phase 2.5 "Model"** — `recon` runs `flow_map` and annotates the intended-behavior +
+  expected-authz oracle for stateful/multi-role apps (skipped *with a scoping note* on a thin API /
+  static site — `tradecraft-doctrine.md` §3). New dispatch rows for the business-process oracle and
+  the pre-auth **account-lifecycle** surface (signup abuse / email-verification bypass / account
+  pre-takeover).
+- **Oracle wired into the consumers** — `web-tester` (test each documented invariant + expected-deny
+  cell), `auth-tester` (walk the expected-authz matrix), `verifier` (judge accepted-value / 200-not-
+  unauthorized against the map), and the `pentest-assess` `logic` + `access-control` lenses. 77 → 78.
+
 ## [0.10.0] — 2026-07-01
 
 *Client-side attack surface + unauth authz-bypass — closing the gap-hunt's Tier-1 findings.*

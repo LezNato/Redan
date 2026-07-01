@@ -386,6 +386,23 @@ class Handler(BaseHTTPRequestHandler):
         # guard makes differs_from_anon False, so this surfaces as a 'public-unauth' lead, not broken authz.
         if path == "/public-info":
             return self._json(200, {"info": "public status page", "build": 12345})
+
+        # --- flow_map surface: a small multi-step business-process the mapper models ---
+        if path == "/shop":              # checkout flow entry: a form with price/qty/coupon + links
+            return self._send(200, '<html><body><a href="/register">register</a> '
+                              '<a href="/admin-orders">orders</a>'
+                              '<form action="/checkout" method="post">'
+                              '<input name="item"><input name="price"><input name="qty">'
+                              '<input name="coupon"><input name="discount">'
+                              '<input name="account_id"><input name="remember">'
+                              '</form></body></html>')
+        if path == "/register":          # registration flow entry
+            return self._send(200, '<html><body><form action="/register-submit" method="post">'
+                              '<input name="email"><input name="username"><input name="password">'
+                              '</form></body></html>')
+        if path == "/admin-orders":      # a gated SENSITIVE path (flow_map access-matrix -> "gated")
+            return self._json(403, {"error": "forbidden"})
+
         if path.startswith("/orders-secure/"):   # ownership ENFORCED -> no IDOR
             oid = path.rsplit("/", 1)[-1]
             u = self._session_user()

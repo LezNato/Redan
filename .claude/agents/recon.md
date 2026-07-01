@@ -43,6 +43,21 @@ with `browser_probe --proxy http://<ip:port>` to clear both the graylist and any
 `web-tester` as leads. A
 disclosed version is a **lead**, not a finding. See `tools/checks/README.md`.
 
+## Model the business process (stateful / multi-role apps)
+For an app with real multi-step flows or multiple roles (checkout, banking, SaaS,
+the account lifecycle), run `flow_map.py <base>` for the OBSERVED skeleton (flows,
+an anonymous access matrix, candidate invariants), then **transform** it into the
+intended-behavior shape — FILL `expected_authz` (the user/admin columns; the anon
+column is pre-seeded from what was observed), FOLD the candidate invariants into
+each flow's `invariants[]`, and set `provisional:false` — and write
+`engagements/<name>/business_process_map.json` (shape:
+`engagements/_template/business_process_map.example.json`). This is the ORACLE the
+active testers + `verifier` judge "accepted-value ≠ bug / 200 ≠ unauthorized"
+against. For an authenticated engagement the authz half already lives in
+`roles.json`; the map fills the black-box/unauthenticated gap. Skip it for a thin
+API / static site and SAY SO (a scoping choice, not a silent gap —
+`tradecraft-doctrine.md` §3). Passive/observational; it does not exploit.
+
 ## Output (return this, don't just narrate)
 A structured map:
 - `hosts[]` — host, ip, ports/services seen, tech, notes

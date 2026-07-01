@@ -128,7 +128,7 @@ pipeline → hard limits → bar:
 
 ## Current state
 
-A comprehensive web-only black-box pentest ensemble: **77 stdlib modules**, **8 agents**, a
+A comprehensive web-only black-box pentest ensemble: **78 stdlib modules**, **8 agents**, a
 **chain-exploitation layer**, edge-egress rotation (proxy + browser channel for
 WAF'd/graylisted targets), independent verification, and a QA-gated single-source
 reporting pipeline. Proven on real engagements (including a WAF'd WordPress site and a React/ASP.NET SPA) +
@@ -138,12 +138,13 @@ oracle, plus import/compile smoke across all modules) and a deterministic **doct
 self-audit** (`tools/checks/doctrine_lint.py`) gate the kit in CI
 (`.github/workflows/tests.yml`) against drift from its own discipline.
 
-### Tooling (`tools/checks/` (77 stdlib modules) + `tools/report-render/`)
+### Tooling (`tools/checks/` (78 stdlib modules) + `tools/report-render/`)
 **Recon**: `http_headers`, `tls_check`, `dns_email` (+CAA/DNSSEC), `wp_fingerprint`, `path_probe`,
 `port_scan`, `recon_sweep` (concurrent), `host_intel` (Shodan passive), `wayback_recon` (CDX), `subdomain_enum` (subfinder-style multi-source passive + wordlist brute), `proxy_rotate` (free-proxy egress rotation when an edge graylists your IP),
 `waf_detect` (JS-challenge routing), `origin_discover`, `multi_target`, `health_check` (prod safety),
 `framework_fingerprint` (active server-framework ID — whatweb-style, beyond the `Server:` banner),
-`screenshot_gallery` (bulk headless-Chromium screenshot triage → HTML gallery; dead host = no shot, not a blank).
+`screenshot_gallery` (bulk headless-Chromium screenshot triage → HTML gallery; dead host = no shot, not a blank),
+`flow_map` (business-process + expected-authz **oracle skeleton** — flows/anon-access-matrix/candidate-invariants → annotated into `business_process_map.json`; the intent model black-box logic/authz testing tests against, filling the unauth gap `roles.json` covers authed).
 **Active testing**: `fuzzer`, `crawler`, `js_secrets`, `js_routes` (deep JS), `sri_check`
 (supply-chain), `header_probe` (host-header/CRLF/method/redirect), `forbidden_bypass` (401/403 access-control bypass battery), `cors_probe` (CWE-942),
 `jwt_probe` (analyzer + offline crack + active forge), `clickjack_probe`, `waf_bypass` (variant battery), `websocket_probe`
