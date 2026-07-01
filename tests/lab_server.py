@@ -143,6 +143,43 @@ def _llm_reply(prompt, defended=False):
     return str(m) if m is not None else "Hello! How can I help you today?"
 
 
+def _guarded_reply(obj):
+    """A model with a NAIVE guardrail that inspects only the LATEST turn: it refuses a lone
+    single-shot override, but a multi-turn Crescendo buildup (prior turns establishing context)
+    slips the same override past it. Single-shot REFUSED, multi-turn FOLLOWED — the multi-turn
+    true-positive that is DISTINCT from single-shot."""
+    msgs = obj.get("messages") if isinstance(obj.get("messages"), list) else []
+    last = _prompt_from(obj)
+    if "redan" in last.lower():
+        prior_user = sum(1 for m in msgs[:-1] if isinstance(m, dict) and m.get("role") == "user")
+        if prior_user >= 1:                          # Crescendo: context established -> complies
+            m = _arith(last)
+            return f"REDAN{m}" if m is not None else "REDAN"
+        return "I can't comply with that request."   # lone single-shot -> refused
+    m = _arith(last)
+    return str(m) if m is not None else "Sure, happy to help with that exercise."
+
+
+def _rag_reply(obj, defended=False):
+    """A RAG-style endpoint. It pulls 'retrieved' context from a data field. VULN: it
+    concatenates that data into the model input and TRUSTS it, so an instruction hidden in the
+    data channel executes. DEFENDED: data is treated as inert content (only the USER prompt can
+    instruct), so the same hidden instruction does NOT fire (the indirect-injection FP bait)."""
+    user = _prompt_from(obj)
+    ctx = ""
+    for k in ("context", "document", "documents", "retrieved", "data", "source",
+              "sources", "knowledge", "passages", "rag", "reference"):
+        if isinstance(obj.get(k), str):
+            ctx = obj[k]
+            break
+    combined = user if defended else (ctx + "\n" + user)   # VULN trusts retrieved data
+    if "redan" in combined.lower():
+        m = _arith(combined)
+        return f"REDAN{m}" if m is not None else "REDAN"
+    m = _arith(combined)
+    return str(m) if m is not None else "Here is a one-sentence summary of the reference material."
+
+
 def _chat_completion(reply):
     """OpenAI-style envelope (one agnostic shape; llm_probe keys on the computed
     marker in the body, not on this shape)."""
@@ -300,6 +337,18 @@ class Handler(BaseHTTPRequestHandler):
         # LLM) but REFUSES injection + leak -> the injection/leak FALSE-POSITIVE bait.
         if p.path == "/api/chat-defended":
             return self._json(200, _chat_completion(_llm_reply(_prompt_from(obj), defended=True)))
+
+        # GUARDED LLM: refuses a single-shot override but a multi-turn Crescendo buildup
+        # slips it past the latest-turn-only guardrail (multi-turn injection true positive).
+        if p.path == "/api/chat-guarded":
+            return self._json(200, _chat_completion(_guarded_reply(obj)))
+
+        # RAG LLM: trusts a 'retrieved data' field -> an instruction hidden there executes
+        # (indirect/data-channel injection TP). -safe sandboxes the data (the FP bait).
+        if p.path == "/api/rag":
+            return self._json(200, _chat_completion(_rag_reply(obj, defended=False)))
+        if p.path == "/api/rag-safe":
+            return self._json(200, _chat_completion(_rag_reply(obj, defended=True)))
 
         # BENIGN non-LLM: echoes the prompt verbatim, never computes -> the LLM
         # detection FALSE-POSITIVE bait (reflection cannot forge the computed marker).

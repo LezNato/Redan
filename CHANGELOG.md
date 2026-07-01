@@ -4,6 +4,40 @@ All notable changes to Redan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/). Versions are git-tagged (`vX.Y.Z`).
 
+## [0.9.0] — 2026-07-01
+
+*`llm_probe` depth — multi-turn/Crescendo + indirect (data-channel) injection.* Enhances an
+existing tool; backward-compatible (still **75 stdlib modules**). Closes the tool's two stated
+honest ceilings. Stays **web-app only** (the AI features *of* the web app).
+
+### Added
+- **`llm_probe.py` — two new black-box injection batteries**, each keeping the computed-marker LEAD
+  discipline (`REDAN`+`17*17`, un-forgeable by a reflector) and each a LEAD (instruction-following
+  != a finding until impact):
+  - **Multi-turn / Crescendo** (`_probe_multi_turn`) — a gradual escalation across a real `messages[]`
+    conversation (benign buildup → elicitation), bypassing a guardrail that inspects only the latest
+    turn. `multi_turn_bypassed_singleshot` flags the stronger case where the single-shot override was
+    *refused* but the ramp slipped past. Bounded; agnostic body (degrades to a flattened transcript for
+    prompt-only endpoints). `--no-multi-turn` to skip.
+  - **Indirect / data-channel** (`_probe_indirect`) — the override hidden in a polyglot *secondary*
+    field (`context`/`document`/`retrieved`/…) with a benign user prompt; firing = the model executed
+    an instruction from the DATA channel (the realistic RAG/agent data-vs-instruction confusion —
+    attacker controls a doc, not the prompt). One request; `--no-indirect` to skip.
+- **`tests/lab_server.py`** — three endpoints: `/api/chat-guarded` (refuses single-shot, follows a
+  multi-turn ramp), `/api/rag` (trusts a retrieved-data field), `/api/rag-safe` (sandboxes the data).
+- **`tests/test_llm_probe.py`** — TP for each new signal (multi-turn fires where single-shot is
+  refused; indirect fires from the data channel) AND FP-rejection (the defended LLM resists both; the
+  data-sandboxing endpoint resists indirect). 16 → **25 checks**.
+
+### Changed
+- Docs — `llm_probe` catalog/inventory/dispatch rows expanded; the "honest ceilings (not covered:
+  multi-turn + indirect)" line replaced with the one REMAINING ceiling (a true cross-request STORED
+  injection needs a known persisted-ingestion vector — the in-request data-channel probe models the
+  same confusion without it). New **pitfalls.md** caveats: "multi-turn success is still
+  instruction-following — the finding is the guardrail it bypassed" and "indirect injection is
+  confirmed only when the data channel is actually attacker-controllable in production" (pairs with
+  `second_order.py` for the stored-ingestion half).
+
 ## [0.8.0] — 2026-07-01
 
 *The exploiter's exploit-dev lane — a gated, captured surface for bespoke one-off PoCs.*
@@ -315,6 +349,7 @@ modules** (68 → 72).
 chain-exploitation layer, independent verification, and a QA-gated single-source
 reporting pipeline. Proven on real engagements.
 
+[0.9.0]: https://github.com/LezNato/Redan/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/LezNato/Redan/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/LezNato/Redan/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/LezNato/Redan/compare/v0.5.0...v0.6.0

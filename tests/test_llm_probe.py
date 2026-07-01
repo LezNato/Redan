@@ -3,8 +3,12 @@
 
   * vulnerable LLM (/api/chat): MUST lead — prompt-injection (battery), a Base64
     filter-bypass variant, system-prompt-leak, and (with --oob) tool-abuse.
-  * defended LLM (/api/chat-defended): detected as an LLM but the injection / leak
-    / tool-abuse signals MUST NOT fire (the false-positive bait).
+  * defended LLM (/api/chat-defended): detected as an LLM but injection / multi-turn /
+    indirect / leak / tool-abuse signals MUST NOT fire (the false-positive bait).
+  * guarded LLM (/api/chat-guarded): refuses the single-shot override but a multi-turn
+    Crescendo ramp slips it past — MUST flag multi_turn_injection (bypassed_singleshot).
+  * RAG LLM (/api/rag): trusts a 'retrieved data' field — MUST flag indirect_injection;
+    its data-sandboxing twin (/api/rag-safe) MUST NOT (the indirect false-positive bait).
   * benign non-LLM (/api/llm-safe): MUST NOT be detected as an LLM at all
     (reflection cannot forge the computed 13*13 marker).
   * MCP server (/mcp): MUST lead — unauthenticated tools/list exposure AND a
@@ -72,10 +76,37 @@ def main():
         rec("llm_probe: defended LLM still detected", d.get("llm_detected") is True)
         rec("llm_probe FP-reject: defended LLM is NOT injectable",
             d.get("prompt_injection") is False, str(d.get("prompt_injection")))
+        rec("llm_probe FP-reject: defended LLM resists multi-turn/Crescendo",
+            d.get("multi_turn_injection") is False, str(d.get("multi_turn_injection")))
+        rec("llm_probe FP-reject: defended LLM resists indirect injection",
+            d.get("indirect_injection") is False, str(d.get("indirect_injection")))
         rec("llm_probe FP-reject: defended LLM does NOT leak", d.get("system_prompt_leak") is False)
         rec("llm_probe FP-reject: defended LLM does NOT abuse tools", d.get("tool_abuse") is False)
         rec("llm_probe FP-reject: detected-but-defended LLM is no lead",
             df.get("disposition") == "none", df.get("disposition"))
+
+        # --- multi-turn / Crescendo: single-shot REFUSED but the ramp slips it past ---
+        gd = run(base, "--path", "/api/chat-guarded", "--no-mcp")
+        g = ep(gd, "/api/chat-guarded")
+        rec("llm_probe TP: multi-turn/Crescendo injection fires", g.get("multi_turn_injection") is True,
+            str(g.get("multi_turn_injection")))
+        rec("llm_probe: guarded LLM refuses the SINGLE-SHOT override (distinct from multi-turn)",
+            g.get("prompt_injection") is False, str(g.get("prompt_injection")))
+        rec("llm_probe TP: multi-turn flagged as bypassing the single-shot guardrail",
+            g.get("multi_turn_bypassed_singleshot") is True)
+        rec("llm_probe TP: guarded LLM is a lead (via multi-turn)", gd.get("disposition") == "lead",
+            gd.get("disposition"))
+
+        # --- indirect / data-channel: instruction hidden in 'retrieved' data executes ---
+        rg = run(base, "--path", "/api/rag", "--no-mcp")
+        rec("llm_probe TP: indirect (data-channel) injection fires",
+            ep(rg, "/api/rag").get("indirect_injection") is True, str(ep(rg, "/api/rag").get("indirect_injection")))
+        rec("llm_probe TP: RAG endpoint is a lead", rg.get("disposition") == "lead", rg.get("disposition"))
+        # data-sandboxing endpoint: the SAME hidden instruction must NOT fire from the data channel
+        rs = run(base, "--path", "/api/rag-safe", "--no-mcp")
+        rec("llm_probe FP-reject: data-sandboxing LLM resists indirect injection",
+            ep(rs, "/api/rag-safe").get("indirect_injection") is False,
+            str(ep(rs, "/api/rag-safe").get("indirect_injection")))
 
         # --- benign non-LLM reflector: NOT an LLM (computed marker un-forgeable) ---
         fp = run(base, "--path", "/api/llm-safe", "--no-mcp")

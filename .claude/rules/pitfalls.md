@@ -239,6 +239,27 @@ demonstrate the LLM tool reaching an internal resource / cloud metadata
 (169.254.169.254) / a port it shouldn't — that internal reach is the confirmed
 SSRF; the external callback alone is a (strong) lead.
 
+**Multi-turn / Crescendo success is still instruction-following — the finding is
+the GUARDRAIL it bypassed.** `llm_probe` flagging `multi_turn_injection` proves a
+gradual escalation elicited the marker; `multi_turn_bypassed_singleshot` proves it
+got past a guardrail that refused the single-shot. On a *bare* chatbot with no
+guardrail and no downstream trust, multi-turn success is the same non-finding as
+single-shot (the model did what it was asked). **Confirm or kill:** the value is the
+*delta* — a safety filter / system-prompt constraint defeated by escalation; with no
+filter to defeat and no trust boundary crossed, it's `informational`, not a finding.
+
+**Indirect (data-channel) injection — confirmed only when the data is ACTUALLY
+attacker-controllable in production.** `llm_probe`'s `indirect_injection` fires
+because the probe put the instruction in a `retrieved data` field *itself* — proving
+the model doesn't separate data from instructions (the real RAG/agent flaw). But the
+probe controls that field directly; the *exploit* needs a real ingestion vector — a
+document, profile, ticket, or KB entry an attacker can write that the AI later
+ingests. **Confirm or kill:** identify the production path by which attacker-authored
+content reaches that data channel (then it's a stored/indirect-injection finding); if
+the only way to populate it is the tester's own request, it's a strong lead about the
+trust model, not yet a demonstrated exploit (pairs with `second_order.py` for the
+stored-ingestion half).
+
 ## Cross-references
 - `evidence-standard.md` — the disposition vocabulary and the confirmed bar.
 - `tradecraft-doctrine.md` — §1 (tag), §2 (test the right identity), §4 (banner ≠
