@@ -4,6 +4,20 @@ All notable changes to Redan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/). Versions are git-tagged (`vX.Y.Z`).
 
+## [0.9.3] — 2026-07-01
+
+*Agent-legible test failures — a failure digest (replacing the dashboard-visual CI split).*
+Patch — dev-tooling only; no toolkit change; still **75 stdlib modules**.
+
+### Changed
+- **`run_all.py` prints a `FAILURES (diagnose here)` digest** on any failed run — it re-surfaces
+  only the failing suite(s) + their `[FAIL]` lines (or a crash tail) in one block at the end. The
+  agent working on the repo diagnoses from the run's own output (or the CI log tail), so the failure
+  is pinpointed without scanning every `[PASS]`. Serves the actual diagnostic path, not a web view.
+- **CI (`tests.yml`) reverts to a single step** (`python tests/run_all.py`). The v0.9.2 two-step
+  split optimized GitHub's visual report — which the working agent never reads; the in-output digest
+  supersedes it. `run_all.py --no-lint` remains for a tests-only local run.
+
 ## [0.9.2] — 2026-07-01
 
 *CI clarity — the doctrine self-audit runs as its own step.* Patch — no toolkit change; still
@@ -386,6 +400,7 @@ modules** (68 → 72).
 chain-exploitation layer, independent verification, and a QA-gated single-source
 reporting pipeline. Proven on real engagements.
 
+[0.9.3]: https://github.com/LezNato/Redan/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/LezNato/Redan/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/LezNato/Redan/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/LezNato/Redan/compare/v0.8.0...v0.9.0
