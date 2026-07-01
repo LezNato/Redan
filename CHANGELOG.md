@@ -4,6 +4,55 @@ All notable changes to Redan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/). Versions are git-tagged (`vX.Y.Z`).
 
+## [0.10.0] — 2026-07-01
+
+*Client-side attack surface + unauth authz-bypass — closing the gap-hunt's Tier-1 findings.*
+Minor — **77 stdlib modules** (was 75).
+
+### Added
+- **`dom_probe.py` — client-side (DOM) battery via Playwright.** The client-side half of the
+  flagship classes the urllib probes can't reach (SPAs push these into the browser). `--xss`
+  INSTRUMENTS the DOM (hooks innerHTML/outerHTML/document.write/eval/setTimeout/insertAdjacentHTML
+  via `add_init_script` BEFORE page scripts) and drives `location.hash`/query sources — a marked
+  value reaching a sink UNENCODED is a taint LEAD (an HTML-encoded reflection is not, per the
+  encoding-neutralization discipline), and only OUR marker-bearing `alert()` counts as execution
+  observed (a benign page alert can't forge the signal). `--postmessage` enumerates `message`
+  handlers (wraps `addEventListener` pre-load — listeners are otherwise non-enumerable) and flags
+  one reaching a sink with NO `event.origin` GATE — a comparison/allowlist check, not a bare
+  `location.origin` reference (WSTG-CLNT-11). `--protopollute` drives `?__proto__[x]=` /
+  `constructor[prototype]` carriers and checks `Object.prototype` pollution against a clean
+  control (CWE-1321). All LEADs. TP+FP lab tests (`test_dom_probe.py`, browser-skip in stdlib CI).
+- **`forbidden_bypass.py` — 401/403 access-control bypass battery** (stdlib). On a forbidden
+  resource: path-normalization (`/admin/`, `//admin`, `/%2e/`, `..;/`, case, `.json`), URL-rewrite
+  headers (`X-Original-URL`), client-IP-spoof headers (`X-Forwarded-For: 127.0.0.1`), and verb
+  swaps (state-changing POST/PUT/PATCH gated behind `--allow-mutation`, RoE) — each controlled vs
+  the original deny AND two nonexistent-path samples via a **length-band** calibration (not exact
+  bytes), so a nonce'd/CSRF homepage can't fabricate a bypass on every request (`path_probe`'s
+  soft-404/WAF-shell discipline, `pitfalls.md`). A differing 2xx is a LEAD, never confirmed
+  (WSTG-ATHZ-01, CWE-284/285). TP+FP lab test (`test_forbidden_bypass.py`).
+
+### Changed
+- **`auth_request.py --funclevel` no longer grades on status alone** (a latent contradiction of the
+  kit's own "200 ≠ unauthorized" doctrine — a soft-deny / login-landing 200 false-flagged as broken
+  authz). Redesigned: a hard `funclevel-broken` finding now needs POSITIVE privileged evidence (the
+  `--canary` marker present in the low-priv 2xx body, which overrides an incidental deny-word); a
+  2xx reach without a canary is a `funclevel-lead` the verifier confirms; an endpoint anon also
+  reaches is surfaced as its own `unauth-public` lead (CWE-284); and a dead/unverifiable low-priv
+  session yields `inconclusive`, never a clean pass (the liveness gate the IDOR mode already had).
+  Broadened the soft-deny blocklist. TP + FP + lead + inconclusive tests (`test_auth_funclevel.py`).
+- **`methodology.md` DOM-XSS dispatch corrected** — the reflected-XSS row claimed "DOM-XSS via
+  `browser_probe.py`", which only *enumerates* the DOM; it now points at `dom_probe.py --xss`. New
+  dispatch rows for DOM-XSS / postMessage / client-side prototype pollution / forbidden-response
+  bypass. Both tools wired into `web-tester`, `tools/checks/README.md`, `CLAUDE.md`, and the
+  coverage matrix; module count 75 → 77.
+- **Pre-release adversarial review + hardening.** A multi-agent review (correctness / FP-FN /
+  doctrine / test-adequacy lenses → per-finding verification vs the source) surfaced 21 confirmed
+  defects the happy-path tests missed — every one fixed before ship: the length-band calibration
+  above, marker-filtered DOM execution, encoding-neutralized taint, origin-GATE (not mere reference)
+  detection, the `//admin` variant that was a dead no-op, the mutating-verb RoE gate, and the
+  funclevel canary/liveness/public-unauth redesign. The lab now models each FP/FN case so the guards
+  are regression-tested, not merely present.
+
 ## [0.9.3] — 2026-07-01
 
 *Agent-legible test failures — a failure digest (replacing the dashboard-visual CI split).*

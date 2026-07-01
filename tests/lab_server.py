@@ -24,6 +24,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HOST = "127.0.0.1"
+_SHELL_CTR = [0]   # monotonic, fixed-WIDTH counter -> a per-request nonce of CONSTANT length
 
 
 def _qval(query, *names):
@@ -279,9 +280,112 @@ class Handler(BaseHTTPRequestHandler):
             v = _qval(query, "q", "name")
             return self._send(200, f"<html><body>Hi {_html.escape(v)}</body></html>")
 
+        # --- forbidden_bypass surface (401/403 access-control bypass) ---
+        # VULNERABLE: an admin path gated ONLY by a client-IP allowlist — a spoofed
+        # X-Forwarded-For/X-Real-IP: 127.0.0.1 reaches the protected content.
+        if path == "/admin-ipwall":
+            ipsrc = " ".join(self.headers.get(h, "") for h in
+                             ("X-Forwarded-For", "X-Real-IP", "X-Client-IP", "X-Originating-IP",
+                              "True-Client-IP", "Client-IP", "X-Forwarded-Host"))
+            if "127.0.0.1" in ipsrc or "localhost" in ipsrc:
+                return self._json(200, {"admin": True, "secret_note": "ADMIN_CANARY_ipwall", "users": 42})
+            return self._json(403, {"error": "forbidden"})
+        # BENIGN: a correctly-locked admin path — 403 to EVERY variant/header/verb (FP bait).
+        if path == "/admin-locked":
+            return self._json(403, {"error": "forbidden"})
+        # BENIGN catch-all SHELL: 403 on the exact path but a CONSTANT-LENGTH, per-request-VARYING
+        # 200 shell on every sibling/variant path (an SPA/edge soft-404). Exact-sha comparison would
+        # false-flag every path variant (the nonce differs each request); the length-band calibration
+        # must recognize them all as the same shell and suppress — the single-snapshot FP regression guard.
+        if path == "/shell-admin":
+            return self._json(403, {"error": "forbidden"})
+        if path.startswith("/shell-admin"):
+            _SHELL_CTR[0] += 1
+            return self._send(200, "<html><body>app shell %020d</body></html>" % _SHELL_CTR[0])
+
+        # --- dom_probe surface (client-side, served as HTML for the browser channel) ---
+        if path == "/dom-xss-vuln":      # sink: location.hash -> innerHTML (executes)
+            return self._send(200, "<!doctype html><html><body><div id=out></div><script>"
+                              "document.getElementById('out').innerHTML="
+                              "decodeURIComponent(location.hash.slice(1));</script></body></html>")
+        if path == "/dom-xss-safe":      # non-executing: hash -> textContent
+            return self._send(200, "<!doctype html><html><body><div id=out></div><script>"
+                              "document.getElementById('out').textContent="
+                              "decodeURIComponent(location.hash.slice(1));</script></body></html>")
+        if path == "/dom-xss-encoded":   # non-executing: hash -> HTML-ESCAPED -> innerHTML (safe sink use)
+            return self._send(200, "<!doctype html><html><body><div id=out></div><script>"
+                              "function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')"
+                              ".replace(/>/g,'&gt;');}"
+                              "document.getElementById('out').innerHTML="
+                              "esc(decodeURIComponent(location.hash.slice(1)));</script></body></html>")
+        if path == "/dom-alert-benign":  # fires a BENIGN alert on load, no sink (FP bait: not OUR marker)
+            return self._send(200, "<!doctype html><html><body><script>"
+                              "alert('welcome to the site');</script></body></html>")
+        if path == "/pm-vuln":           # message handler -> innerHTML, NO origin check
+            return self._send(200, "<!doctype html><html><body><div id=o></div><script>"
+                              "window.addEventListener('message',function(e){"
+                              "document.getElementById('o').innerHTML=e.data;});</script></body></html>")
+        if path == "/pm-safe":           # innerHTML SINK gated by a REAL e.origin check — the FP-reject
+                                         # now hinges ONLY on the origin heuristic, not an absent sink
+            return self._send(200, "<!doctype html><html><body><div id=o></div><script>"
+                              "window.addEventListener('message',function(e){"
+                              "if(e.origin!==location.origin)return;"
+                              "document.getElementById('o').innerHTML=e.data;});</script></body></html>")
+        if path == "/pm-logs-origin":    # references e.origin but only LOGS it (no gate) -> innerHTML sink
+                                         # = a real missing-origin bug the tighter regex must still flag
+            return self._send(200, "<!doctype html><html><body><div id=o></div><script>"
+                              "window.addEventListener('message',function(e){"
+                              "console.log('msg from '+e.origin);"
+                              "document.getElementById('o').innerHTML=e.data;});</script></body></html>")
+        if path == "/pp-vuln":           # unsafe deep-merge of query -> Object.prototype pollution
+            return self._send(200, "<!doctype html><html><body><script>"
+                              "function setDeep(o,p,val){var c=o;for(var i=0;i<p.length-1;i++){"
+                              "if(typeof c[p[i]]!=='object'||c[p[i]]===null){c[p[i]]={};}c=c[p[i]];}"
+                              "c[p[p.length-1]]=val;}"
+                              "new URLSearchParams(location.search).forEach(function(v,k){"
+                              "if(k.indexOf('[')!==-1){setDeep({},k.replace(/\\]/g,'').split('['),v);}});"
+                              "</script></body></html>")
+        if path == "/pp-safe":           # guarded merge: skips __proto__/constructor/prototype
+            return self._send(200, "<!doctype html><html><body><script>"
+                              "function setDeep(o,p,val){var c=o;for(var i=0;i<p.length-1;i++){var key=p[i];"
+                              "if(key==='__proto__'||key==='constructor'||key==='prototype')return;"
+                              "if(typeof c[key]!=='object'||c[key]===null){c[key]={};}c=c[key];}"
+                              "c[p[p.length-1]]=val;}"
+                              "new URLSearchParams(location.search).forEach(function(v,k){"
+                              "if(k.indexOf('[')!==-1){setDeep({},k.replace(/\\]/g,'').split('['),v);}});"
+                              "</script></body></html>")
+
         # --- authenticated surface (for the IDOR 4-cell oracle) ---
         if path == "/me":            # identity endpoint; reflects the session user
             return self._json(200, {"user": self._session_user()})
+        # funclevel: BROKEN — any logged-in user reaches admin content (anon is 401).
+        if path == "/admin-panel":
+            if not self._session_user():
+                return self._json(401, {"error": "login required"})
+            return self._json(200, {"panel": "admin", "all_users": ["alice", "bob", "carol"],
+                                    "marker": "ADMIN_PANEL_OPEN"})
+        # funclevel: ENFORCED-but-soft — a non-admin gets HTTP 200 with a DENIAL body (the
+        # exact false positive the status-only check produced; the fix must NOT flag it).
+        if path == "/admin-softdeny":
+            u = self._session_user()
+            if u == "admin":
+                return self._json(200, {"panel": "admin", "secret_note": "REAL_ADMIN"})
+            if not u:
+                return self._json(401, {"error": "login required"})
+            return self._send(200, "<html><body>Access denied: administrators only.</body></html>")
+        # funclevel: ENFORCED-but-soft with a wording the OLD DENY_RE missed (tests the broadened
+        # blocklist — a 200 "You do not have permission" must NOT read as broken authz).
+        if path == "/admin-softdeny2":
+            u = self._session_user()
+            if u == "admin":
+                return self._json(200, {"panel": "admin", "secret_note": "REAL_ADMIN"})
+            if not u:
+                return self._json(401, {"error": "login required"})
+            return self._send(200, "<html><body>You do not have permission to view this page.</body></html>")
+        # funclevel: genuinely PUBLIC — an identical 200 to anon and any logged-in role. The anon-diff
+        # guard makes differs_from_anon False, so this surfaces as a 'public-unauth' lead, not broken authz.
+        if path == "/public-info":
+            return self._json(200, {"info": "public status page", "build": 12345})
         if path.startswith("/orders-secure/"):   # ownership ENFORCED -> no IDOR
             oid = path.rsplit("/", 1)[-1]
             u = self._session_user()

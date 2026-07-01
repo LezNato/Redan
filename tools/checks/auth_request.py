@@ -31,6 +31,16 @@ import _authlib as A
 
 SAFE = {"GET", "HEAD", "OPTIONS"}
 
+# A 2xx body that is actually a DENIAL page (soft-deny) — a 200 "access denied" must NOT
+# read as reached access (tradecraft §"200 ≠ unauthorized"; pitfalls.md). funclevel uses this
+# to avoid flagging a soft-deny/login page as broken function-level access control.
+DENY_RE = re.compile(r"access denied|not authoriz|unauthori[sz]|forbidden|permission denied|"
+                     r"please (?:log|sign)[ -]?in|login required|must be logged in|sign in to|"
+                     r"insufficient (?:privilege|permission)|do not have permission|"
+                     r"don'?t have permission|not allowed|you are not allowed|"
+                     r"administrators? only|admins? only|restricted area|area is restricted|"
+                     r"requires? (?:admin|elevated|special)", re.I)
+
 def load_session(engagement, roles, role_name):
     """Return (role_dict|None, cookiejar, bearer, extra_headers)."""
     if role_name == "anon":
@@ -154,21 +164,72 @@ def main():
         return
 
     if a.funclevel:
-        # function-level access control: low-priv must NOT reach privileged endpoints (CWE-285)
+        # Function-level access control (CWE-285). A 2xx is NOT proof (tradecraft §"200 ≠ unauthorized"):
+        # a soft-deny page, a login-landing 200, or public content all return 2xx. Discipline:
+        #   * a HARD finding ("funclevel-broken", severity high) needs POSITIVE privileged evidence — the
+        #     operator's --canary present in the low-priv 2xx body (a present marker OVERRIDES an incidental
+        #     deny-word). Without a canary, a 2xx reach is a LEAD ("funclevel-lead") the verifier confirms.
+        #   * the low-priv body must DIFFER from the anon control (authentication mattered); an endpoint anon
+        #     ALSO reaches is surfaced as its OWN unauth lead (CWE-284), never folded into a clean verdict.
+        #   * a dead/unverifiable low-priv session can't test authz → verdict "inconclusive" (as IDOR mode does),
+        #     never "funclevel-enforced" (the worst false-negative — a dead session silently reads clean).
         if not (a.role and a.endpoints):
             print(json.dumps({"ok": False, "error": "--funclevel requires --role + --endpoints (comma-list or @file)"})); sys.exit(2)
         eps = a.endpoints[1:].splitlines() if a.endpoints.startswith("@") else [e.strip() for e in a.endpoints.split(",") if e.strip()]
-        matrix, fails = [], []
+        matrix, strong, leads = [], [], []
+        session_bad = False
         for ep in eps:
-            ev, _ = one(a.engagement, roles, a.role, ep, verify=verify)
-            matrix.append({"endpoint": ep, "status": ev.get("status"), "session_valid": ev.get("session_valid")})
-            if ev.get("status") and 200 <= ev["status"] < 300:
-                fails.append(ep)
-        print(json.dumps({"ok": True, "mode": "funclevel", "role": a.role, "verdict": "funclevel-broken" if fails else "funclevel-enforced",
-                           "endpoints_tested": len(eps), "accessible_as_low_priv": fails,
+            ev, r = one(a.engagement, roles, a.role, ep, canary=a.canary, verify=verify)
+            ev_anon, ra = one(a.engagement, roles, "anon", ep, canary=a.canary, verify=verify)
+            body = (r["body"] or b"").decode("utf-8", "replace")
+            anon_body = (ra["body"] or b"").decode("utf-8", "replace")
+            st, anon_st = ev.get("status"), ev_anon.get("status")
+            is_2xx = bool(st and 200 <= st < 300)
+            anon_2xx = bool(anon_st and 200 <= anon_st < 300)
+            soft_deny = bool(DENY_RE.search(body[:4000]))
+            differs_from_anon = ev.get("body_sha256") != ev_anon.get("body_sha256")
+            canary_present = (a.canary is not None) and bool(ev.get("canary_present"))
+            live = ev.get("session_valid") is True
+            if not live:
+                session_bad = True
+            reach = is_2xx and len(body.strip()) > 0 and (differs_from_anon or not anon_2xx)
+            strong_hit = reach and canary_present                             # positive privileged evidence
+            lead_hit = reach and live and a.canary is None and not soft_deny   # 2xx reach, no canary, not a deny page
+            public_unauth = anon_2xx and len(anon_body.strip()) > 0 and not bool(DENY_RE.search(anon_body[:4000]))
+            cls = ("reached-privileged" if strong_hit else "public-unauth" if public_unauth
+                   else "reached-lead" if lead_hit else "soft-deny-or-public" if is_2xx else "denied")
+            cell = {"endpoint": ep, "status": st, "session_valid": ev.get("session_valid"),
+                    "anon_status": anon_st, "soft_deny": soft_deny,
+                    "differs_from_anon": differs_from_anon, "classification": cls}
+            if a.canary is not None:
+                cell["canary_present"] = canary_present
+            if strong_hit:
+                strong.append(ep)
+            elif lead_hit:
+                leads.append({"endpoint": ep, "kind": "low-priv-reach"})
+            if public_unauth and ep not in strong:
+                leads.append({"endpoint": ep, "kind": "unauth-public"})
+            matrix.append(cell)
+        if session_bad and not strong:
+            verdict = "inconclusive"
+        elif strong:
+            verdict = "funclevel-broken"
+        elif leads:
+            verdict = "funclevel-lead"
+        else:
+            verdict = "funclevel-enforced"
+        note = ("LEAD-graded except a canary-confirmed reach. 'funclevel-broken' (a finding) needs the --canary "
+                "privileged marker present in the low-priv 2xx body; a 2xx reach without a canary is a 'reached-lead' "
+                "the verifier confirms; an endpoint anon also reaches is an 'unauth-public' lead (CWE-284); a "
+                "dead/unverifiable low-priv session yields 'inconclusive', never a clean pass. "
+                + ("--canary supplied." if a.canary else "pass --canary <privileged-marker> for a confirmable finding."))
+        print(json.dumps({"ok": True, "mode": "funclevel", "role": a.role, "verdict": verdict,
+                           "endpoints_tested": len(eps), "accessible_as_low_priv": strong, "leads": leads,
                            "findings": [{"id": "function-level-access-control", "severity": "high",
-                            "detail": f"low-priv role '{a.role}' reached privileged endpoint(s) {fails} with HTTP 2xx — function-level access control is broken (CWE-285); not just object-level (IDOR)"}] if fails else [],
-                           "matrix": matrix}, indent=2)); return
+                            "detail": f"low-priv role '{a.role}' reached privileged endpoint(s) {strong} with the --canary "
+                                      f"privileged marker present (2xx, distinct from the anon control) — function-level "
+                                      f"access control is broken (CWE-285); not just object-level (IDOR)"}] if strong else [],
+                           "note": note, "matrix": matrix}, indent=2)); return
 
     if a.massassign:
         # mass-assignment: inject an elevated field, re-read identity, assert no privilege delta (CWE-915)

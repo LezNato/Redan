@@ -56,7 +56,7 @@ source disclosure), and `sqlmap_run` (SQLi confirmation) on every param a lead p
 the rest of the ACTIVE battery — `fuzzer`, `crawler`, `js_secrets`, `js_routes`, `param_probe`, `ssrf_probe`,
 `csp_probe`, `csrf_probe`, `oauth_probe`, `graphql_probe` + `graphql_adv`, `xxe_probe`, `soap_probe` (WSDL exposure + XXE + SQLi via SOAP), `deser_detect`,
 `smuggle_probe`, `h2_smuggle`, `race_probe`, `proto_pollute`, `cache_probe`, `second_order`,
-`takeover_probe`, `clickjack_probe`, `waf_bypass`, `websocket_probe`, `xss_payloads`, `browser_probe`, `flow_probe`,
+`takeover_probe`, `clickjack_probe`, `waf_bypass`, `websocket_probe`, `xss_payloads`, `dom_probe` (client-side DOM-XSS source→sink / postMessage / prototype-pollution — the SPA client-side half of the XSS class), `forbidden_bypass` (401/403 access-control bypass battery — run on every 401/403 route), `browser_probe`, `flow_probe`,
 `upload_probe` (file-upload abuse), `rate_limit_test` (API4 rate-limit detector — a detector, not a stuffer),
 `openapi_probe`, `framework_fingerprint` — are all web-tester-run. Drive each from a recon lead
 (its dispatch row), never as a blind spray; fold the emitted JSON `findings[]`/lead blobs into
