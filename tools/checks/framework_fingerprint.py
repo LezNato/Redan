@@ -336,6 +336,9 @@ def main():
 
     # map route -> framework for attribution
     route_fw = {r[0]: r[1] for r in ROUTES}
+    # a uniform NON-200 shell (403/401 edge) is now suppressed by is_fallback_shell too — reflect that in
+    # shell_present so the top-level flag/note match the per-route suppression (was 200-only => contradictory).
+    shell_present = shell_present or any(rr.get("fallback_shell") for rr in route_results)
     for rr in sorted(route_results, key=lambda x: x.get("path", "")):
         path = rr.get("path")
         rr["framework"] = route_fw.get(path)
@@ -393,8 +396,8 @@ def main():
     note_parts.append("Active read-only identification. Header/cookie routes are leads — banners can "
                       "be static/CDN-fronted; a real route or error signature is stronger evidence.")
     if shell_present:
-        note_parts.append("A uniform-200 fallback shell was detected on random paths — route/error "
-                          "hits that matched it were discarded (WAF/SPA catch-all guard).")
+        note_parts.append("A uniform fallback shell (200, or a uniform 4xx edge) was detected on random "
+                          "paths — route/error hits that matched it were discarded (WAF/SPA catch-all guard).")
 
     out = {
         "target": args.url,

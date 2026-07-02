@@ -150,8 +150,9 @@ def main():
             verdict = "inconclusive"; reasons.append("OTHER role session not live (re-login) — cannot test")
         elif ev_anon.get("canary_present"):
             verdict = "public-not-authz-bug"; reasons.append("anonymous request also returns the owner canary — object is PUBLIC by design, not an access-control bug")
-        elif ev_other.get("canary_present") and ev_other.get("body_sha256") != ev_ctrl.get("body_sha256"):
-            verdict = "idor-confirmed"; reasons.append("OTHER role's response carries OWNER's canary, anon does not, and it differs from the bogus-id control")
+        elif (ev_other.get("canary_present") and not ev_ctrl.get("canary_present")
+              and ev_other.get("body_sha256") != ev_ctrl.get("body_sha256")):
+            verdict = "idor-confirmed"; reasons.append("OTHER role's response carries OWNER's canary, anon does not, the bogus-id CONTROL does not (canary is object-specific), and it differs from the control")
             if same_tenant:
                 reasons.append("NOTE: owner and other share a declared tenant/authz scope — confirm this crosses an intended boundary before rating (may be legitimate org-shared access)")
         else:
@@ -175,7 +176,8 @@ def main():
         #     never "funclevel-enforced" (the worst false-negative — a dead session silently reads clean).
         if not (a.role and a.endpoints):
             print(json.dumps({"ok": False, "error": "--funclevel requires --role + --endpoints (comma-list or @file)"})); sys.exit(2)
-        eps = a.endpoints[1:].splitlines() if a.endpoints.startswith("@") else [e.strip() for e in a.endpoints.split(",") if e.strip()]
+        eps = ([e.strip() for e in open(a.endpoints[1:], encoding="utf-8").read().splitlines() if e.strip()]
+               if a.endpoints.startswith("@") else [e.strip() for e in a.endpoints.split(",") if e.strip()])
         matrix, strong, leads = [], [], []
         session_bad = False
         for ep in eps:

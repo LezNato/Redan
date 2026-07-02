@@ -49,5 +49,6 @@ if __name__ == "__main__":
     ap.add_argument("--canary", default="xz2ndOrderCanary9q8r")
     ap.add_argument("--insecure", action="store_true")
     a = ap.parse_args()
-    rurls = a.render_urls[1:].splitlines() if a.render_urls.startswith("@") else [u.strip() for u in a.render_urls.split(",") if u.strip()]
+    rurls = ([u.strip() for u in open(a.render_urls[1:], encoding="utf-8").read().splitlines() if u.strip()]
+             if a.render_urls.startswith("@") else [u.strip() for u in a.render_urls.split(",") if u.strip()])
     print(json.dumps(run(a.engagement, a.role, a.inject_url, a.field, rurls, a.canary, not a.insecure), indent=2))

@@ -73,13 +73,16 @@ def to_sarif(eng, findings):
 def to_csv(findings, path):
     cols = ["Summary", "Severity", "CVSS", "CWE", "Location", "Description",
             "Reproduction", "Remediation", "Confidence"]
+    def _safe(v):   # neutralize spreadsheet formula injection (CWE-1236) in the client-deliverable CSV
+        s = "" if v is None else str(v)
+        return "'" + s if s[:1] in ("=", "+", "-", "@", "\t", "\r") else s
     with open(path, "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh); w.writerow(cols)
         for f in findings:
-            w.writerow([g(f, "title"), g(f, "severity"), g(f, "cvss_score", "cvss"), g(f, "cwe"),
-                        g(f, "location", "url"), g(f, "description", "impact", "detail"),
-                        txt(g(f, "reproduction")), g(f, "remediation"),
-                        g(f, "validation_status")])
+            w.writerow([_safe(c) for c in [
+                g(f, "title"), g(f, "severity"), g(f, "cvss_score", "cvss"), g(f, "cwe"),
+                g(f, "location", "url"), g(f, "description", "impact", "detail"),
+                txt(g(f, "reproduction")), g(f, "remediation"), g(f, "validation_status")]])
 
 def to_defectdojo(findings):
     out = []

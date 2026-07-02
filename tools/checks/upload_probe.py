@@ -79,6 +79,9 @@ BATTERY = [
 PATH_RE = re.compile(r'(?:https?://[^\s"\'<>]+)|/(?:uploads?|files|media|images?|img|assets|static|u/)[^\s"\'<>]+', re.I)
 JSON_URL_RE = re.compile(r'"(?:url|path|file|location|src|href|name)"\s*:\s*"([^"]+)"', re.I)
 REJECT_RE = re.compile(r'\b(invalid|not allowed|forbidden|denied|reject|unsupported|not permitted|extension|file type|upload failed|error)\b', re.I)
+# a NARROWER set for the acceptance gate — bare 'error' matches a benign {"error":null} JSON field and
+# would blind the tool on common APIs; require an actual rejection phrase to treat a 2xx as NOT accepted.
+ACCEPT_REJECT_RE = re.compile(r'\b(not allowed|not permitted|forbidden|invalid (?:file|type|extension|format)|unsupported (?:file|type)|upload failed|file type not|rejected)\b', re.I)
 
 
 def _boundary():
@@ -114,9 +117,10 @@ def _post_file(url, field, filename, ctype, body, method, headers, extra_data, t
 def _accepted(status, body):
     if status is None:
         return False
-    # a 2xx alone is not acceptance — a 200 that carries a rejection message ("not allowed",
-    # "invalid type", …) is a REJECT, not an upload-no-filtering finding. Gate on the body too.
-    return 200 <= status < 300 and not (body and REJECT_RE.search(body))
+    # a 2xx alone is not acceptance — a 200 that carries a real rejection PHRASE ("not allowed",
+    # "invalid type", …) is a REJECT, not an upload-no-filtering finding. Gate on the body too (but with
+    # ACCEPT_REJECT_RE, not the broad REJECT_RE, so an {"error":null} success body isn't misread).
+    return 200 <= status < 300 and not (body and ACCEPT_REJECT_RE.search(body))
 
 
 def _paths(body):

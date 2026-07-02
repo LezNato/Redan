@@ -46,7 +46,7 @@ def is_auth_mutation(cmd):
     if "auth_request.py" in c and (re.search(r'--allow-mutation', c) or re.search(r'--method[ =]\s*' + MUT, c, re.I)):
         return True
     # curl authenticated mutation: a mutating -X/-d AND an auth carrier
-    curl_mut = re.search(r'-X\s*' + MUT, c, re.I) or (re.search(r'\bcurl\b', c) and re.search(r'(?<!\w)-d\b|--data', c))
+    curl_mut = re.search(r'(?:-X|--request)\s*' + MUT, c, re.I) or (re.search(r'\bcurl\b', c) and re.search(r'(?<!\w)-d\b|--data', c))
     has_auth = re.search(r'-b\s|--cookie|(?:-H|--header)\s*["\']?\s*(Cookie|Authorization)', c, re.I)
     if re.search(r'\bcurl\b', c) and curl_mut and has_auth:
         return True

@@ -60,7 +60,8 @@ def read_list(lines, key):
         if capturing:
             m = re.match(r"^\s+-\s+(.*)$", line)
             if m:
-                out.append(m.group(1).strip().strip('"').strip("'"))
+                val = re.sub(r"\s+#.*$", "", m.group(1))   # strip an inline comment (session-start.sh's field() does the same)
+                out.append(val.strip().strip('"').strip("'"))
                 continue
             # a non-list, non-blank, non-comment line ends the block
             if line.strip() and not line.lstrip().startswith("#"):
@@ -97,14 +98,13 @@ def is_private(host):
     except ValueError:
         return host in ("localhost",) or host.endswith(".local")
 
-# Extensions the bare-domain regex would otherwise misread as a TLD
-# (finding_schema.py, pitfalls.md, scope.yaml, vuln_lab.js ...). A dotted
-# filename in a Bash/PowerShell command is NOT a host; treating one as a host
-# made enforce_allowlist deny the toolkit's OWN commands. URL-scheme and IPv4
-# matches are still always treated as hosts (an explicit target). This only
-# affects the bare-token heuristic, and only the denylist is safety-critical —
-# no out_of_scope entry (*.gov/*.mil/*.bank/SSO domains) ends in a file ext, so
-# this can never hide a denied host; it only stops file-name false positives.
+# Extensions the bare-domain regex would otherwise misread as a TLD (a dotted filename in a
+# Bash/PowerShell command is NOT a host; treating one as a host made enforce_allowlist deny the
+# toolkit's OWN commands). NOTE: some of these (sh, md, zip, py ...) are ALSO real TLDs, so a bare
+# scheme-less token like `evil.sh` is ambiguous. To stay safe, extract_hosts(skip_file_ext=False)
+# is used for the DENYLIST so a denied host on a file-ext TLD is still caught; the filter only
+# affects the allowlist/fail-closed path (where a bare filename must not be treated as a target).
+# URL-scheme and IPv4 matches are always treated as hosts regardless of this list.
 FILE_EXT = {
     "md", "markdown", "rst", "py", "pyc", "pyo", "pyw", "js", "mjs", "cjs", "jsx",
     "ts", "tsx", "json", "yaml", "yml", "toml", "ini", "cfg", "conf", "lock",
@@ -130,7 +130,7 @@ def _canon_host(h):
     return h
 
 
-def extract_hosts(blob: str):
+def extract_hosts(blob, skip_file_ext=True):
     # percent-decode first so %65vil.gov / %32%31... obfuscation is seen
     try:
         blob = urllib.parse.unquote(blob)
@@ -143,7 +143,7 @@ def extract_hosts(blob: str):
         hosts.add(m.group(0))
     for m in re.finditer(r"\b((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,})\b", blob, re.I):
         host = m.group(1)
-        if host.rsplit(".", 1)[-1].lower() in FILE_EXT:   # dotted filename, not a host
+        if skip_file_ext and host.rsplit(".", 1)[-1].lower() in FILE_EXT:   # dotted filename, not a host (allowlist path only)
             continue
         hosts.add(host)
     return {_canon_host(h.lower().strip(".")) for h in hosts if h}
@@ -162,8 +162,9 @@ def main():
         sys.exit(0)
 
     blob = json.dumps(data.get("tool_input", {}))
-    hosts = extract_hosts(blob)
-    if not hosts:
+    hosts = extract_hosts(blob)                            # filtered (bare filenames dropped) — allowlist/fail-closed path
+    deny_hosts = extract_hosts(blob, skip_file_ext=False)  # UNFILTERED — the denylist must see a host even on a file-ext TLD
+    if not hosts and not deny_hosts:
         sys.exit(0)
 
     scope = find_scope_file()
@@ -184,14 +185,16 @@ def main():
     out_patterns = read_list(lines, "out_of_scope_patterns")
     enforce = read_bool(lines, "enforce_allowlist", False)
 
-    for host in sorted(hosts):
-        # 1) hard denylist — always wins
+    # 1) hard denylist — over the UNFILTERED set so a denied host on a .sh/.md/.zip TLD can't hide
+    for host in sorted(deny_hosts):
         for e in out_scope:
             if host_matches(host, e):
                 deny(f"{host} matches out_of_scope entry '{e}'. Edit scope.yaml if this is wrong.")
         for p in out_patterns:
             if p.lower() in host:
                 deny(f"{host} matches out_of_scope_pattern '{p}'.")
+    # 2-4) infra / fail-closed / allowlist — over the FILTERED set (bare filenames are not hosts)
+    for host in sorted(hosts):
         # 2) infra / local — never gated (so an absent scope never bricks normal ops)
         if is_private(host) or any(host == a or host.endswith("." + a) for a in INFRA_ALLOW):
             continue

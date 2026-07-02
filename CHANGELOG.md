@@ -4,6 +4,51 @@ All notable changes to Redan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/). Versions are git-tagged (`vX.Y.Z`).
 
+## [0.12.3] — 2026-07-02
+
+*QC hardening round 3 — a second adversarial sweep found 35 issues; 22 fixed, 0 regressions from
+rounds 1-2.* Patch — no new module, still **78 stdlib modules**; behaviour-compatible.
+
+### Security (hooks + redaction)
+- **`scope-gate`**: `read_list` strips an inline `# comment` (a commented in_scope/out_of_scope entry was
+  mis-parsed → the denylist silently failed OPEN); the denylist now runs over the UNFILTERED host set so a
+  scheme-less out-of-scope host on a file-extension TLD (`.sh`/`.md`/`.zip`) can't hide behind the filename
+  heuristic (the false "can never hide a denied host" comment corrected).
+- **`mutation-gate`**: gate curl's long `--request <verb>` form (only `-X` was matched).
+- **`redact`**: catch `"Authorization": "Basic …"` in indented/quoted JSON (browser-channel / HAR evidence)
+  that the `^`-anchored pattern missed; scoped to real auth schemes to avoid benign matches.
+- **`export`**: CSV cells are formula-injection-neutralized (CWE-1236) in the client deliverable.
+
+### False-finding / FP reductions
+- **`lfi_probe`**: the php-source signal subtracts baseline markers too (a page statically serving base64
+  PHP no longer fabricates "source disclosure").
+- **`upload_probe`**: the acceptance body-gate uses a narrower reject-phrase set (a `{"error":null}` success
+  is no longer misread as a rejection).
+- **`waf_bypass`**: a bypass is reported only if the ORIGINAL payload was actually blocked (no-WAF endpoints
+  no longer report every variant as a bypass).
+- **`csrf_probe`**: CONFIRMED requires a token was ACTUALLY stripped (a named-but-absent `--token-name` no
+  longer reaches CONFIRMED).
+- **`clickjack_probe`**: a scoped `frame-ancestors *.cdn.example.com` is no longer treated as bare `*`.
+- **`auth_request`** (IDOR oracle): confirm requires the bogus-id CONTROL to LACK the canary (canary must be
+  object-specific), killing an ambient page-global-canary false confirm.
+- **`framework_fingerprint`**: `shell_present` reflects non-200 shell suppression (fixes the self-
+  contradictory output the v0.12.2 non-200 change introduced).
+
+### Correctness / consistency
+- **`auth_request --endpoints @file`** and **`second_order --render-urls @file`** now READ the file (both
+  treated the filename as the literal single entry → silently tested nothing).
+- **`js_routes`**: the jQuery `$.ajax` pattern was over-escaped and never matched; **`xss_payloads`** token
+  exfil reads `.content||.value`; **`rate_limit_test`** adds 503 to LOCK_STATUS (per its docstring);
+  **`finding_ledger`** retest-delta lists iterate sorted (were set-ordered → non-deterministic).
+- doc drift: `tests/run_all.py` docstring + CHANGELOG compare-link definitions (0.10.0–0.12.3).
+
+### Deferred (13, recorded with fixes) & reverted (1)
+Reverted: an `llm_probe` filter-bypass-labelling tweak (needs a lab fixture + test change to land cleanly).
+Deferred: oob interactsh startup-timeout + local-poll lock, tls_check unreachable-vs-cert-invalid,
+origin_discover content-correspondence, h2_smuggle reproduce-before-flag, header_probe Location reflection,
+render/finding_schema info-count reconciliation, framework selective-403 + xsrf-token attribution,
+openapi LEAK_RE scoping, deser_detect body scan, health_check baseline-relative status.
+
 ## [0.12.2] — 2026-07-02
 
 *QC hardening round 2 — the 11 deferred findings resolved (10 fixed, 1 declined with rationale).*
@@ -598,6 +643,13 @@ modules** (68 → 72).
 chain-exploitation layer, independent verification, and a QA-gated single-source
 reporting pipeline. Proven on real engagements.
 
+[0.12.3]: https://github.com/LezNato/Redan/compare/v0.12.2...v0.12.3
+[0.12.2]: https://github.com/LezNato/Redan/compare/v0.12.1...v0.12.2
+[0.12.1]: https://github.com/LezNato/Redan/compare/v0.12.0...v0.12.1
+[0.12.0]: https://github.com/LezNato/Redan/compare/v0.11.1...v0.12.0
+[0.11.1]: https://github.com/LezNato/Redan/compare/v0.11.0...v0.11.1
+[0.11.0]: https://github.com/LezNato/Redan/compare/v0.10.0...v0.11.0
+[0.10.0]: https://github.com/LezNato/Redan/compare/v0.9.3...v0.10.0
 [0.9.3]: https://github.com/LezNato/Redan/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/LezNato/Redan/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/LezNato/Redan/compare/v0.9.0...v0.9.1

@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _http import get as http_get
 
 # callable-endpoint patterns
-FETCH_RE = re.compile(r"""(?:fetch|axios(?:\.(?:get|post|put|delete|patch))?|\\\$\.ajax|\.(?:get|post|put|delete|patch)\s*\(|XMLHttpRequest)[^"']{0,40}["']([~/][^"']{2,120})["']""", re.I)
+FETCH_RE = re.compile(r"""(?:fetch|axios(?:\.(?:get|post|put|delete|patch))?|\$\.ajax|\.(?:get|post|put|delete|patch)\s*\(|XMLHttpRequest)[^"']{0,40}["']([~/][^"']{2,120})["']""", re.I)
 STRING_PATH_RE = re.compile(r"""["']((?:/|\\/)(?:api|rest|v\d|graphql|gql|admin|user|account|auth|login|logout|register|upload|export|import|search|graphql|internal|private|debug|test|dev|staging)[^"']{0,100})["']""", re.I)
 ROUTE_TABLE_RE = re.compile(r"""(?:path|route)\s*:\s*["']([/~/][^"']{1,120})["']""", re.I)
 GQL_OP_RE = re.compile(r"""(?:query|mutation)\s+([A-Za-z0-9_]+)\s*[({]""")

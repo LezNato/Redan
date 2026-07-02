@@ -164,8 +164,9 @@ def probe(args, ctx):
     raw_results = {}
 
     # ---- TEST B: strip token ----
+    stripped_token = False   # did TEST B ACTUALLY remove a token? (a NAMED-but-absent token strips nothing)
     if tok and tok[0] == "body" and tok[1] in ctrl_fields:
-        b_fields = dict(ctrl_fields); del b_fields[tok[1]]
+        b_fields = dict(ctrl_fields); del b_fields[tok[1]]; stripped_token = True
     else:
         b_fields = dict(ctrl_fields)
     b_headers = dict(ctrl_headers)
@@ -179,7 +180,7 @@ def probe(args, ctx):
         # case-insensitive removal
         for hk in list(b_headers):
             if hk.lower() == hdr_strip_name.lower():
-                del b_headers[hk]
+                del b_headers[hk]; stripped_token = True
     b_status, b_body, b_err, b_t, b_final = send(
         args.url, args.method, b_fields, b_headers, cookie, ctx, args.timeout)
     strip_accepted = is_accepted(b_status)
@@ -237,11 +238,11 @@ def probe(args, ctx):
         note = ("A control 2xx and B strip 2xx look like missing enforcement, BUT a random path "
                 "returned the same 200 body -> the edge serves a uniform shell to non-JS clients. "
                 "Re-test through the browser channel before calling this CSRF.")
-    elif csrf_signal and not (tok or hdr_strip_name):
-        verdict = ("LEAD — no anti-CSRF token was located to strip, so the 'strip' request equalled the "
-                   "control (no real differential). Provide --token-name/--header, or the endpoint may rely "
-                   "on SameSite/Origin. NOT a confirmed CSRF.")
-        note = "Test B removed nothing; strip==control is trivially 'accepted'. Locate the token first."
+    elif csrf_signal and not stripped_token:
+        verdict = ("LEAD — no anti-CSRF token was actually stripped (none located, or a --token-name that "
+                   "wasn't present in the request), so the 'strip' request equalled the control (no real "
+                   "differential). Provide a token that exists, or the endpoint may rely on SameSite/Origin. NOT a confirmed CSRF.")
+        note = "Test B removed nothing; strip==control is trivially 'accepted'. Locate/confirm the token first."
     elif csrf_signal and origin_checked:
         verdict = ("LEAD — the token is not enforced, BUT the server validated Origin/Referer (the wrong-Origin "
                    "request was REJECTED while the control succeeded). A cross-site browser request is blocked by "

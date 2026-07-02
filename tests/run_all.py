@@ -5,9 +5,9 @@ Stdlib only, no network: each suite spins up a local 127.0.0.1 lab or tests pure
 functions. This is the gate CI runs (see .github/workflows/tests.yml) and the one
 command to run locally before a commit:  python tests/run_all.py
 
-  --no-lint   skip the doctrine_lint self-audit (CI runs it as a SEPARATE step so a
-              lint failure is distinguishable from a test failure in the red X; the
-              default local run still includes it).
+  --no-lint   skip the doctrine_lint self-audit. CI does NOT pass this — it runs the one
+              `python tests/run_all.py` step with lint INLINE; the end-of-run FAILURES digest
+              distinguishes a lint failure from a test failure. --no-lint is for a tests-only local run.
 """
 import glob
 import os

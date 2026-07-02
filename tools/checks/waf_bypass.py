@@ -57,6 +57,8 @@ def run(url, method, param, payload, block_marker):
         results.append({"variant": label, "status": s, "blocked": blocked, "len": len(b or "")})
         if label != "original" and not blocked and s and 200 <= s < 500:  # 'original' is the control, not a bypass
             bypasses.append(label)
+    if not any(r["variant"] == "original" and r["blocked"] for r in results):
+        bypasses = []   # the ORIGINAL payload was not blocked => no WAF rule to bypass (a no-WAF endpoint)
     return {"target": url, "ok": True, "payload": payload, "param": param, "block_marker": block_marker,
             "baseline_status": s0, "variants": results, "bypass_variants": bypasses,
             "findings": [{"id": "waf-bypass-variant", "severity": "medium",

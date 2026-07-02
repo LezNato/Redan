@@ -121,7 +121,7 @@ def cmd_retest(args):
                   if e.get("target") == target and e["status"] in ("open", "regressed")}
     fixed, still_open, regressed, new = [], [], [], []
     # prior-open findings absent from the new run = presumed FIXED; present = still open
-    for u in prior_open:
+    for u in sorted(prior_open):   # deterministic order (prior_open is a set) so the delta lists are byte-stable
         e = led["findings"][u]
         if u in cur:
             _touch(e, cur[u], args.date, args.engagement); e["status"] = "open"; still_open.append(u)

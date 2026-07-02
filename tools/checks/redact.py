@@ -40,6 +40,12 @@ P = [
     ("auth-header", "secret",
      re.compile(r'(?im)^(authorization|proxy-authorization|cookie|x-auth-token|x-api-key|x-csrf-token|x-xsrf-token)(\s*:\s*)(?!\s*\[REDACTED).+$'),
      r'\1\2[REDACTED]'),
+    # JSON-value auth header (indented/quoted from browser-channel / HAR / "Copy as fetch" evidence) —
+    # the ^-anchored pattern above misses `"Authorization": "Basic ..."`. Scoped to real auth SCHEMES so it
+    # catches the Basic/Digest gap without flagging benign committed JSON (Bearer/JWT are caught elsewhere).
+    ("auth-header-json", "secret",
+     re.compile(r'(?i)"(authorization|proxy-authorization)"\s*:\s*"(?!\[REDACTED)((?:Basic|Digest|Negotiate|NTLM|AWS4-HMAC-SHA256)\s+[^"]{6,})"'),
+     r'"\1": "[REDACTED]"'),
     ("bearer", "secret",
      re.compile(r'(?i)\bbearer\s+(?!\[REDACTED)(?=[A-Za-z0-9._~+/\-]*[0-9._~+/\-])[A-Za-z0-9._~+/\-]{8,}=*'), 'Bearer [REDACTED]'),
     ("jwt", "secret",

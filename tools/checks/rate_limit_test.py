@@ -48,7 +48,7 @@ DEFAULT_MARKERS = ["too many requests", "rate limit", "rate-limit", "temporarily
                    "locked", "blocked", "captcha", "try again later", "throttl",
                    "too many login", "too many attempts"]
 THROTTLE_STATUS = {429}
-LOCK_STATUS = {403, 423}
+LOCK_STATUS = {403, 423, 503}   # 503 = load-shed / rate-limit (counted only when it CHANGES mid-burst, per _is_throttle)
 AUTH_SURFACE_RE = re.compile(r"(login|signin|sign-in|log-in|auth|otp|2fa|mfa|password|reset|token|account|verify)", re.I)
 HARD_CAP = 500
 

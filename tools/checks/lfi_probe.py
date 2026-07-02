@@ -208,6 +208,13 @@ def test_payload(url, param, payload, family, method, data_tmpl, ctx, timeout,
         if decoded:
             php_hits = _grep_php_markers(decoded)
             if php_hits:
+                # payload-INDUCED only: subtract php markers already decodable from the baselines (a page
+                # statically serving a base64 blob decoding to <?php/define( is not source disclosure).
+                _bdec = (_find_php_source(baseline_body) or "") + (_find_php_source(rand_body) or "")
+                if _bdec:
+                    _bm = set(_grep_php_markers(_bdec))
+                    php_hits = [h for h in php_hits if h not in _bm]
+            if php_hits:
                 decoded_snippet = (decoded[:240] + "…") if len(decoded) > 240 else decoded
     # --- Signal 3: php://input / data:// reflected marker ---
     reflected_marker = False
