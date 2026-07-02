@@ -82,7 +82,7 @@ def compute_counts(d):
     c = {s: 0 for s in SEV_ORDER}
     for f in d.get("findings", []):
         c[sev_class(f.get("severity"))] += 1
-    c["info"] += len(d.get("informational", []))   # informational[] items count toward info (matches finding_schema.py)
+    c["info"] = len(d.get("informational", []))   # info is authoritative from informational[] (matches finding_schema.py exactly)
     return c
 
 # ===================== evidence embedding (standalone deliverable) =====================

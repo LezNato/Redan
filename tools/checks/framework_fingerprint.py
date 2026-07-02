@@ -39,7 +39,8 @@ COOKIE_MAP = [
     ("_session",                "Ruby on Rails"),
     ("_rails",                  "Ruby on Rails"),
     ("laravel_session",         "Laravel (PHP)"),
-    ("xsrf-token",              "Laravel (PHP)"),     # XSRF-TOKEN paired w/ laravel_session
+    # NOTE: standalone XSRF-TOKEN is a GENERIC CSRF cookie (Angular/axios default, many stacks) — not a
+    # Laravel signal on its own; laravel_session above is the real attribution. (Dropped to avoid the FP.)
     ("symfony",                 "Symfony (PHP)"),
     ("csrftoken",               "Django (Python)"),
     ("sessionid",               "Django (Python)"),   # Django default name
@@ -224,8 +225,9 @@ def route_worker(base, path, ctx, timeout, fallbacks):
     if err:
         return {"path": path, "error": err, "status": status, "fallback": False}
     shell = is_fallback_shell(status, body, fallbacks)
-    # non404 AND not the catch-all shell AND a plausibly-real content-length
-    real = (status and status != 404 and not shell and status < 500)
+    # a 2xx/3xx distinctive route is a real hit; a bare 401/403 is ambiguous (a genuinely gated route OR a
+    # SELECTIVE WAF block on attack paths) — not a strong framework signal, so it does not count as real_hit.
+    real = bool(status and 200 <= status < 400 and not shell)
     return {"path": path, "url": url, "status": status, "fallback_shell": shell,
             "real_hit": bool(real), "body_len": len(body or b"")}
 

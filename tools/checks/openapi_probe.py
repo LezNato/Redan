@@ -33,7 +33,7 @@ SPEC_PATHS = [
 LEAK_RE = re.compile(
     r"(?i)(traceback|exception|stack\s*trace|at\s+[a-z]+\.[a-z]+\([a-z0-9_]+\.java:\d+\)|"
     r"/usr/(local/)?(bin|lib|src|share)/|c:\\\\(users|program|windows)|"
-    r"org\.springframework|javax\.servlet|django\.core|flask\.|express|"
+    r"org\.springframework|javax\.servlet|django\.core|flask\.|"
     r"NullPointerException|SQLException|ORA-\d{5}|PG::\w+|MySQLdb|pymysql|"
     r"<title>Whoops|internal server error|unhandled|Debug\b)"
 )
@@ -318,8 +318,8 @@ def classify(status, body, base_status, base_len, base_hash=None):
         sig, suspect = "2xx_where_baseline_blocked", "authz / validation gap"
     elif status and 200 <= status < 300 and diverges:
         sig, suspect = "2xx_on_invalid", "validation gap (accepted bad input)"
-    if body and LEAK_RE.search(body):
-        sig = sig or "error_leak"
+    if body and diverges and LEAK_RE.search(body):   # gate on divergence: a leak token present in the
+        sig = sig or "error_leak"                    # BASELINE too (same body, no divergence) is not payload-induced
         suspect = (suspect + "; " if suspect else "") + "info disclosure: stack/internal/framework (CWE-209)"
     if abs(delta) > 500 and base_status and status and base_status == status:
         # same status, very different body -> data/authz divergence

@@ -66,6 +66,10 @@ def scan_url(url):
     for label, sig in SIGNS:
         if isinstance(sig, re.Pattern) and sig.search(body):
             sinks.append({"where": "body", "type": label})
+    # Java serialized blob (rO0AB = base64 of the 0xACED0005 stream header) — the low-FP, high-impact
+    # string sig the loop above skips (it only scans Pattern sigs); anchored to avoid random-base64 hits.
+    if re.search(r'\brO0AB[A-Za-z0-9+/]{8,}', body):
+        sinks.append({"where": "body", "type": "java-serialized"})
     seen = set()
     for s in sinks:
         k = (s["where"], s["type"])

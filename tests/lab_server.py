@@ -161,6 +161,20 @@ def _guarded_reply(obj):
     return str(m) if m is not None else "Sure, happy to help with that exercise."
 
 
+def _filtered_reply(obj):
+    """A NAIVE input filter: refuses a PLAIN 'redan' override (it inspects the raw prompt text) but DECODES
+    and OBEYS a Base64-encoded one — the input-filter-BYPASS true positive (plain refused, encoded slips
+    through). injection_filter_bypass is a real bypass here BECAUSE the plain override was refused first."""
+    prompt = _prompt_from(obj)
+    m = _maybe_b64_override(prompt)               # encoded override slips the raw-text keyword filter
+    if m is not None:
+        return f"REDAN{m}"
+    if "redan" in prompt.lower():                 # plain override -> caught by the keyword filter
+        return "Blocked: that request was filtered."
+    a = _arith(prompt)
+    return str(a) if a is not None else "Hello! How can I help you today?"
+
+
 def _rag_reply(obj, defended=False):
     """A RAG-style endpoint. It pulls 'retrieved' context from a data field. VULN: it
     concatenates that data into the model input and TRUSTS it, so an instruction hidden in the
@@ -488,6 +502,11 @@ class Handler(BaseHTTPRequestHandler):
         # slips it past the latest-turn-only guardrail (multi-turn injection true positive).
         if p.path == "/api/chat-guarded":
             return self._json(200, _chat_completion(_guarded_reply(obj)))
+
+        # FILTERED LLM: a naive keyword filter refuses the PLAIN override but obeys a Base64-encoded one
+        # (input-filter-bypass TP — injection_filter_bypass fires only because the plain override was refused).
+        if p.path == "/api/chat-filtered":
+            return self._json(200, _chat_completion(_filtered_reply(obj)))
 
         # RAG LLM: trusts a 'retrieved data' field -> an instruction hidden there executes
         # (indirect/data-channel injection TP). -safe sandboxes the data (the FP bait).

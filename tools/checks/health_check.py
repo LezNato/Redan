@@ -61,6 +61,11 @@ def baseline(url, samples=5):
 def check(url, base, latency_factor=4.0):
     s = sample(url)
     degraded, block = [], detect_block(s)
+    # baseline-relative: if the "block" is just the target's NORMAL status (an app that always 401/403/406s),
+    # it is not a degradation — suppress the STATUS-based block when it equals the baseline status_mode.
+    if (block and block.startswith(f"HTTP {s.get('status')}")
+            and s.get("status") == base.get("status_mode") and s.get("status") in (401, 403, 406)):
+        block = None
     if not s.get("ok") or s.get("status") is None:
         degraded.append(f"unreachable ({s.get('error')})")
     elif s["status"] >= 500:

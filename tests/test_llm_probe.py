@@ -61,8 +61,14 @@ def main():
         v = ep(tp, "/api/chat")
         rec("llm_probe TP: LLM detected (computed 13*13 marker)", v.get("llm_detected") is True)
         rec("llm_probe TP: prompt-injection signal (REDAN+17*17)", v.get("prompt_injection") is True)
-        rec("llm_probe TP: Base64 filter-bypass variant fires", bool(v.get("injection_filter_bypass")),
-            str(v.get("injection_filter_bypass")))
+        # injection_filter_bypass is a real BYPASS only when the plain override was refused — so it must
+        # NOT fire on the plain-vulnerable /api/chat (plain already works there = not a filter bypass)...
+        rec("llm_probe: no false filter-bypass on the plain-vulnerable endpoint",
+            not v.get("injection_filter_bypass"), str(v.get("injection_filter_bypass")))
+        # ...but it MUST fire on /api/chat-filtered, which refuses the plain override and obeys the Base64 one.
+        vfb = ep(run(base, "--path", "/api/chat-filtered", "--no-mcp"), "/api/chat-filtered")
+        rec("llm_probe TP: Base64 filter-bypass (plain refused, encoded obeyed)",
+            bool(vfb.get("injection_filter_bypass")), str(vfb.get("injection_filter_bypass")))
         rec("llm_probe TP: system-prompt-leak signal", v.get("system_prompt_leak") is True)
 
         # --- vulnerable LLM with --oob: tool-abuse / excessive-agency callback ---

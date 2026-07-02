@@ -39,10 +39,12 @@ def _req(url, headers=None, method="GET", timeout=15):
 def probe_host(url):
     probe = "evil-hostheader-probe.test"
     s, h, b = _req(url, {"X-Forwarded-Host": probe})
-    reflected = probe in b
-    return {"reflected": reflected, "status": s,
+    loc = h.get("Location") or h.get("location") or ""
+    where = "Location header" if probe in loc else "response body" if probe in b else None
+    reflected = where is not None   # the primary host-injection manifestation is an absolute Location redirect (often empty body)
+    return {"reflected": reflected, "reflected_in": where, "status": s,
             "finding": {"id": "host-header-injection", "severity": "low",
-                        "detail": "X-Forwarded-Host reflected into the response body — a host-header-injection / password-reset-poisoning / cache-poisoning primitive; chain to impact"} if reflected else None}
+                        "detail": f"X-Forwarded-Host reflected into the {where} — a host-header-injection / password-reset-poisoning / cache-poisoning primitive; chain to impact"} if reflected else None}
 
 def probe_crlf(url):
     flag = "X-Probe-Injected-Flag"

@@ -100,22 +100,33 @@ def discover(domain):
     edge_set = set(edge_ips)
     candidates = {ip: nms for ip, nms in ip_map.items() if not cdn(ip) and ip not in edge_set}
     # 4) probe likely-origin candidates directly
+    behind_cdn = any(cdn(i) for i in edge_ips)
     def probe(ip):
         st, srv, snip = fetch_raw(ip, domain)
-        # require a REAL fingerprint match (site marker OR the edge Server banner) — a bare '<html' matches
-        # nearly every web response (cPanel/nginx welcome, an HTML 4xx) => false 'origin-exposed-bypassing-waf'.
-        serves = bool(st and st < 500 and ("wordpress" in snip.lower()
-                                           or (edge_server and srv and srv.split("/")[0] == edge_server.split("/")[0])))
+        content_match = "wordpress" in snip.lower()   # a real site-content marker in the origin body
+        banner_match = bool(edge_server and srv and srv.split("/")[0] == edge_server.split("/")[0])
+        # HIGH only on real content correspondence — a bare Server-family banner (both 'nginx') matches
+        # countless unrelated origins, and a bare '<html' matches nearly every response.
+        serves = bool(st and st < 500 and content_match)
         return {"ip": ip, "names": ip_map.get(ip, []), "status": st, "server": srv,
+                "content_match": content_match, "banner_match": banner_match,
                 "serves_site_directly": serves, "snippet": snip}
     with ThreadPoolExecutor(max_workers=workers(cap=8)) as ex:
         probes = list(ex.map(probe, list(candidates)[:25]))
     hits = [p for p in probes if p["serves_site_directly"]]
+    banner_leads = [p for p in probes if p.get("banner_match") and not p.get("content_match")
+                    and p.get("status") and p["status"] < 500]
     findings = []
     for p in hits:
+        _cdn = "" if behind_cdn else " (NOTE: the edge was not detected as CDN/WAF-fronted — confirm there is a protection layer to bypass)"
         findings.append({"id": "origin-exposed-bypassing-waf", "severity": "high", "cwe": "CWE-693",
                          "detail": f"origin {p['ip']} ({', '.join(p['names'][:3])}) serves {domain} directly "
-                                   f"(Server: {p['server']}) — WAF/CDN bypassable by connecting to the origin IP"})
+                                   f"(Server: {p['server']}) — WAF/CDN bypassable by connecting to the origin IP" + _cdn})
+    for p in banner_leads:   # same Server family as the edge but no content match => a LEAD, not a HIGH finding
+        findings.append({"id": "candidate-origin-ip", "severity": "low", "cwe": "CWE-693",
+                         "detail": f"candidate origin {p['ip']} ({', '.join(p['names'][:3])}) returns the same Server "
+                                   f"family ({p['server']}) as the edge but no site-content match — a LEAD; fetch it and "
+                                   f"confirm it serves {domain} before rating."})
     return {"target": domain, "ok": True,
             "edge": {"ips": edge_ips, "behind_cloudflare": any(cdn(i) for i in edge_ips),
                      "status": edge_status, "server": edge_server},

@@ -51,7 +51,18 @@ def probe_h2cl(url, timeout):
     anom_t = _last_time(cl_anom)
     control_code = control.split()[0] if control else "ERR"
     anom_code = cl_anom.split()[0] if cl_anom else "ERR"
-    suspicious = (abs(anom_t - control_t) > 2.0) or (control_code != anom_code)
+    both_numeric = control_code.isdigit() and anom_code.isdigit()
+    # a status differential is only interesting if BOTH legs returned a real HTTP code AND the anomaly
+    # wasn't simply REJECTED (a 4xx/5xx on the anomaly = the server correctly refused it, NOT a desync);
+    # a curl error ('ERR'/'000') is inconclusive, not a signal.
+    status_desync = both_numeric and control_code != anom_code and anom_code[0] not in ("4", "5")
+    timing_desync = both_numeric and abs(anom_t - control_t) > 2.0
+    suspicious = status_desync or timing_desync
+    if status_desync:   # reproduce once — a single differential can be transient (doctrine §8)
+        anom2 = curl(["--http2", "-X", "POST", "-H", "Content-Length: 0", "-d", "smuggle-body", url], timeout)
+        code2 = anom2.split()[0] if anom2 else "ERR"
+        if not (code2.isdigit() and code2 == anom_code):
+            suspicious = timing_desync   # didn't reproduce -> drop the status signal
     return {"probe": "h2cl-timing", "control": control, "cl_anomaly": cl_anom, "suspicious": suspicious,
             "findings": ([{"id": "h2cl-desync-suspected", "severity": "medium",
                           "detail": f"H2 CL-anomaly timing/status differs from control ({control} vs {cl_anom}) — possible H2.CL desync (CWE-444). Confirm manually; full frame-level crafting needs the Python h2 lib."}] if suspicious else []),

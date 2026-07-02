@@ -64,8 +64,14 @@ class Collab:
         try:
             self._proc = subprocess.Popen([binp, "-json"], cwd=self._tmpdir,
                                           stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-            # the client prints its collaborator domain to stdout on startup
-            line = self._proc.stdout.readline().decode("utf-8", "replace")
+            # BOUNDED startup read of the collaborator-domain line — a hung interactsh must not block
+            # start() forever; on timeout we fall back to the local backend.
+            _hold = {}
+            def _read_domain():
+                try: _hold["line"] = self._proc.stdout.readline().decode("utf-8", "replace")
+                except Exception: _hold["line"] = ""
+            _rt = threading.Thread(target=_read_domain, daemon=True); _rt.start(); _rt.join(8)
+            line = _hold.get("line", "")
             m = re.search(r"([a-z0-9]{20,}\.[a-z0-9.\-]+)", line)
             if m:
                 self._interact_domain = m.group(1)
@@ -106,7 +112,10 @@ class Collab:
             # the reader thread accumulates interaction lines; check membership (platform-independent)
             with self._interact_lock:
                 return any(marker in ln for ln in self._interactions)
-        return any(marker in h for h in self._httpd.hits)
+        try:   # snapshot: the handler thread mutates .hits concurrently (RuntimeError if iterated live)
+            return any(marker in h for h in list(self._httpd.hits))
+        except RuntimeError:
+            return any(marker in h for h in list(self._httpd.hits))
 
     def stop(self):
         try:

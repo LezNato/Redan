@@ -304,14 +304,17 @@ def probe_llm(url, headers, authed, cfg):
             out["injection_variant"] = f"override#{i + 1}"
             out["injection_snippet"] = r.text[:160]
             break
-    # encoding / filter-bypass — an obfuscated override the input filter didn't catch
-    for label, ev in _encoded_variants():
-        r = _ask(url, ev, headers)
-        if not r.error and INJ_RE.search(r.text):
-            out["prompt_injection"] = True
-            out["injection_filter_bypass"] = label
-            out.setdefault("injection_snippet", r.text[:160])
-            break
+    # encoding / filter-bypass — only a real BYPASS if the PLAIN overrides were REFUSED (else the encoded
+    # variant firing is just the model following instructions, not a defeated filter). Mirrors the
+    # multi_turn_bypassed_singleshot guard.
+    if not out["prompt_injection"]:
+        for label, ev in _encoded_variants():
+            r = _ask(url, ev, headers)
+            if not r.error and INJ_RE.search(r.text):
+                out["prompt_injection"] = True
+                out["injection_filter_bypass"] = label
+                out.setdefault("injection_snippet", r.text[:160])
+                break
 
     # multi-turn / Crescendo escalation — bounded conversation that bypasses a guardrail
     # inspecting only the latest turn. Strongest signal when single-shot was REFUSED.

@@ -4,6 +4,38 @@ All notable changes to Redan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/). Versions are git-tagged (`vX.Y.Z`).
 
+## [0.12.4] — 2026-07-02
+
+*QC hardening round 4 — the 13 findings deferred from round 3 all cleared.* Patch — no new module,
+still **78 stdlib modules**; behaviour-compatible.
+
+### False-positive reductions
+- **`tls_check`**: an unreachable / non-TLS `:443` no longer fabricates a `cert-invalid` MEDIUM — only a
+  real `SSLCertVerificationError` is `valid:false`; a transport failure is `valid:null` (unknown).
+- **`origin_discover`**: the `origin-exposed-bypassing-waf` HIGH now requires real site-content
+  correspondence; a bare same-Server-family banner is downgraded to a `candidate-origin-ip` LEAD, and the
+  detail notes when the edge wasn't CDN/WAF-fronted.
+- **`h2_smuggle`**: an H2.CL differential requires both legs to return real HTTP codes, excludes a correct
+  4xx/5xx rejection of the anomaly, and re-fires once to reproduce before flagging (was a one-shot medium).
+- **`framework_fingerprint`**: a distinctive-route hit must be 2xx/3xx (a bare 401/403 is ambiguous — a
+  gated route OR a selective WAF block); a standalone `XSRF-TOKEN` cookie no longer attributes Laravel.
+- **`openapi_probe`**: `error_leak` is divergence-gated and no longer keys on the over-broad bare `express`
+  token (a token persistent in the baseline no longer fires per-operation).
+- **`health_check`**: a target whose NORMAL state is 401/403/406 no longer aborts every check — the
+  status-based block is suppressed when it equals the baseline `status_mode` (429/503 still abort).
+
+### Correctness / robustness
+- **`header_probe`**: host-header injection is detected in the `Location` header too (the primary
+  manifestation — an absolute redirect, often empty-bodied), not only the body.
+- **`oob.py`**: the interactsh startup read is bounded (a hung binary falls back to local instead of
+  blocking forever); `poll()` snapshots the local hits set (no `RuntimeError` on a callback mid-poll).
+- **`deser_detect`**: the response body is scanned for a Java serialized blob (`rO0AB…`) — the low-FP,
+  high-impact string sig the pattern-only loop skipped.
+- **`render_report`**: the info scoreboard count is authoritative from `informational[]` (exact match with
+  `finding_schema`, no drift warning).
+- **`llm_probe`**: `injection_filter_bypass` is claimed only when the PLAIN override was refused (a real
+  filter bypass) — with a lab fixture (`/api/chat-filtered`) + TP/FP-reject test to lock it.
+
 ## [0.12.3] — 2026-07-02
 
 *QC hardening round 3 — a second adversarial sweep found 35 issues; 22 fixed, 0 regressions from
@@ -643,6 +675,7 @@ modules** (68 → 72).
 chain-exploitation layer, independent verification, and a QA-gated single-source
 reporting pipeline. Proven on real engagements.
 
+[0.12.4]: https://github.com/LezNato/Redan/compare/v0.12.3...v0.12.4
 [0.12.3]: https://github.com/LezNato/Redan/compare/v0.12.2...v0.12.3
 [0.12.2]: https://github.com/LezNato/Redan/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/LezNato/Redan/compare/v0.12.0...v0.12.1

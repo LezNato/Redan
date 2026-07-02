@@ -56,7 +56,9 @@ def get_cert(host, port):
     except ssl.SSLCertVerificationError as e:
         return {"valid": False, "error": f"verification failed: {e.verify_message or e}"}
     except Exception as e:
-        return {"valid": False, "error": str(e)}
+        # transport failure / handshake error / timeout / non-TLS :443 — NOT a cert-verification failure.
+        # valid=None (unknown), so check() does not fabricate a 'cert-invalid' finding for an unreachable host.
+        return {"valid": None, "unreachable": True, "error": str(e)}
 
 def check(target):
     host, _, p = target.partition(":")
