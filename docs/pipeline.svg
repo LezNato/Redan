@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 600" role="img" aria-label="Redan pipeline: scope gate to recon, model, parallel finders, refute-bias verifier, exploiter, reporter, QA gate, deliverable, with the retest ledger loop">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0.5,1 L9,5 L0.5,9" fill="none" stroke="rgba(148,163,184,.9)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
+    <marker id="arrowHot" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0.5,1 L9,5 L0.5,9" fill="none" stroke="#a5b4fc" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker>
+    <marker id="arrowBlk" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0.5,1 L9,5 L0.5,9" fill="none" stroke="rgba(244,63,94,.92)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
+    <marker id="arrowLoop" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0.5,1 L9,5 L0.5,9" fill="none" stroke="rgba(52,211,153,.92)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
+    <pattern id="dots" width="26" height="26" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="rgba(148,163,184,.045)"/></pattern>
+    <linearGradient id="ng" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#18222f"/><stop offset="1" stop-color="#111a26"/></linearGradient>
+    <linearGradient id="ngo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c2138"/><stop offset="1" stop-color="#13172b"/></linearGradient>
+    <radialGradient id="spot" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="rgba(129,140,248,.17)"/><stop offset="1" stop-color="rgba(129,140,248,0)"/></radialGradient>
+    <filter id="ds" x="-25%" y="-30%" width="150%" height="160%"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#04060b" flood-opacity="0.5"/></filter>
+    <filter id="dso" x="-40%" y="-45%" width="180%" height="190%"><feDropShadow dx="0" dy="1" stdDeviation="5" flood-color="#818cf8" flood-opacity="0.24"/></filter>
+  </defs>
+  <style>
+    text{fill:#e2e8f1}
+    .sans{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+    .mono{font-family:ui-monospace,"JetBrains Mono",SFMono-Regular,Menlo,Consolas,monospace}
+    .tag{font-size:8px;font-weight:700;letter-spacing:.16em}
+    .title{font-size:14px;font-weight:600;letter-spacing:-.015em;fill:#f0f4f9}
+    .sub{font-size:10px;font-weight:400;fill:#93a1b4}
+    .gate-k{fill:#a5b4fc;font-size:12px;font-weight:700}
+    .gate-p{fill:#9aa6bd;font-size:11.5px;font-weight:400}
+    .deliver-k{fill:#6ee7b7;font-size:12px;font-weight:700;letter-spacing:.04em}
+    .deliver-p{fill:#8fb8a6;font-size:11px;font-weight:400}
+    .anno{fill:#7c889b;font-size:9.5px;font-weight:600;letter-spacing:.05em}
+    .cap{fill:#8b96ab;font-size:11px;font-weight:600;letter-spacing:.11em}
+    .leg{fill:#93a1b4;font-size:10px;font-weight:500}
+    .link{fill:none;stroke:rgba(148,163,184,.42);stroke-width:1.5}
+    .link.hot{stroke:rgba(129,140,248,.75);stroke-width:1.8}
+    .link.block{stroke:rgba(244,63,94,.64);stroke-dasharray:1.5 5;stroke-width:1.7;stroke-linecap:round}
+    .link.loop{stroke:rgba(52,211,153,.56);stroke-dasharray:1.5 5;stroke-width:1.7;stroke-linecap:round}
+  </style>
+
+  <rect x="0" y="0" width="1400" height="600" rx="22" fill="#0b0f17"/>
+  <rect x="0" y="0" width="1400" height="600" rx="22" fill="url(#dots)"/>
+  <ellipse cx="704" cy="300" rx="196" ry="152" fill="url(#spot)"/>
+
+  <!-- finder grouping panel (parallel lane) -->
+  <rect x="424" y="180" width="184" height="240" rx="16" fill="rgba(96,165,250,.03)" stroke="rgba(96,165,250,.11)" stroke-width="1"/>
+
+  <!-- scope gate band -->
+  <rect x="56" y="40" width="1288" height="44" rx="11" fill="rgba(129,140,248,.05)" stroke="rgba(129,140,248,.30)" stroke-dasharray="1 5" stroke-width="1.4"/>
+  <text x="80" y="67"><tspan class="mono gate-k">scope.yaml</tspan><tspan class="sans gate-p">   the authorization gate  ·  scope-gate hook denies any out-of-scope host  ·  </tspan><tspan class="mono gate-k">read first, every phase</tspan></text>
+
+  <!-- section captions (parallel -> serial) -->
+  <text class="mono cap" x="516" y="178" text-anchor="middle">PARALLEL FINDERS</text>
+  <path class="link" d="M600,174 H700" stroke="rgba(148,163,184,.28)" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <text class="mono cap" x="760" y="178" text-anchor="middle">SERIAL TRUTH</text>
+
+  <!-- connectors: spine -->
+  <path class="link" d="M216,300 H251" marker-end="url(#arrow)"/>
+  <path class="link" d="M404,300 C424,300 420,224 439,224" marker-end="url(#arrow)"/>
+  <path class="link" d="M404,300 H439" marker-end="url(#arrow)"/>
+  <path class="link" d="M404,300 C424,300 420,376 439,376" marker-end="url(#arrow)"/>
+  <path class="link hot" d="M592,224 C612,224 608,300 627,300" marker-end="url(#arrowHot)"/>
+  <path class="link hot" d="M592,300 H627" marker-end="url(#arrowHot)"/>
+  <path class="link hot" d="M592,376 C612,376 608,300 627,300" marker-end="url(#arrowHot)"/>
+  <path class="link" d="M780,300 H815" marker-end="url(#arrow)"/>
+  <path class="link" d="M968,300 H1003" marker-end="url(#arrow)"/>
+  <path class="link" d="M1156,300 H1191" marker-end="url(#arrow)"/>
+
+  <!-- PASS drop -->
+  <path class="link" d="M1268,328 V495" marker-end="url(#arrow)"/>
+  <text class="mono anno" x="1281" y="432">PASS</text>
+
+  <!-- BLOCK feedback -->
+  <path class="link block" d="M1238,272 C1238,236 1118,236 1097,269" marker-end="url(#arrowBlk)"/>
+  <text class="mono anno" x="1167" y="226" text-anchor="middle" fill="rgba(244,63,94,.82)">BLOCK · fix &amp; re-gate</text>
+
+  <!-- retest / ledger return channel -->
+  <path class="link loop" d="M150,498 C92,498 36,474 36,438 L36,110 C36,82 46,66 62,66" marker-end="url(#arrowLoop)"/>
+  <text class="mono anno" transform="translate(25,372) rotate(-90)" fill="rgba(52,211,153,.8)">retest · finding_uid ledger</text>
+
+  <!-- nodes -->
+  <g transform="translate(64,272)"><rect width="152" height="56" rx="12" fill="url(#ng)" stroke="rgba(148,163,184,.16)" filter="url(#ds)"/><rect x="10" y="11" width="3" height="34" rx="1.5" fill="#60a5fa"/><text class="mono tag" x="23" y="19" fill="#60a5fa">SONNET · PH2</text><text class="sans title" x="23" y="35">recon</text><text class="sans sub" x="23" y="48">passive surface map</text></g>
+  <g transform="translate(252,272)"><rect width="152" height="56" rx="12" fill="url(#ng)" stroke="rgba(148,163,184,.16)" filter="url(#ds)"/><rect x="10" y="11" width="3" height="34" rx="1.5" fill="#60a5fa"/><text class="mono tag" x="23" y="19" fill="#60a5fa">SONNET · PH2.5</text><text class="sans title" x="23" y="35">model</text><text class="sans sub" x="23" y="48">flow_map → oracle</text></g>
+
+  <g transform="translate(440,196)"><rect width="152" height="56" rx="12" fill="url(#ng)" stroke="rgba(148,163,184,.16)" filter="url(#ds)"/><rect x="10" y="11" width="3" height="34" rx="1.5" fill="#60a5fa"/><text class="mono tag" x="23" y="19" fill="#60a5fa">SONNET · PH3</text><text class="sans title" x="23" y="35">web-tester</text><text class="sans sub" x="23" y="48">injection · IDOR · SSRF</text></g>
+  <g transform="translate(440,272)"><rect width="152" height="56" rx="12" fill="url(#ng)" stroke="rgba(148,163,184,.16)" filter="url(#ds)"/><rect x="10" y="11" width="3" height="34" rx="1.5" fill="#60a5fa"/><text class="mono tag" x="23" y="19" fill="#60a5fa">SONNET · PH3</text><text class="sans title" x="23" y="35">auth-tester</text><text class="sans sub" x="23" y="48">authed IDOR · privesc</text></g>
+  <g transform="translate(440,348)"><rect width="152" height="56" rx="12" fill="url(#ng)" stroke="rgba(148,163,184,.16)" filter="url(#ds)"/><rect x="10" y="11" width="3" height="34" rx="1.5" fill="#60a5fa"/><text class="mono tag" x="23" y="19" fill="#60a5fa">SONNET · PH3</text><text class="sans title" x="23" y="35">cloud-iam</text><text class="sans sub" x="23" y="48">exposure · IAM · SSRF</text></g>
+
+  <g transform="translate(628,272)"><rect x="-4" y="-4" width="160" height="64" rx="15" fill="none" stroke="rgba(129,140,248,.24)" stroke-width="1.2"/><rect width="152" height="56" rx="12" fill="url(#ngo)" stroke="rgba(129,140,248,.62)" filter="url(#dso)"/><rect x="10" y="11" width="3" height="34" rx="1.5" fill="#818cf8"/><text class="mono tag" x="23" y="19" fill="#a5b4fc">OPUS · PH4 · THE GATE</text><text class="sans title" x="23" y="35" style="font-size:15px">verifier</text><text class="sans sub" x="23" y="49" fill="#aab4e6">refute-bias skeptic</text></g>
+  <g transform="translate(816,272)"><rect width="152" height="56" rx="12" fill="url(#ngo)" stroke="rgba(129,140,248,.55)" filter="url(#dso)"/><rect x="10" y="11" width="3" height="34" rx="1.5" fill="#818cf8"/><text class="mono tag" x="23" y="19" fill="#a5b4fc">OPUS · CHAIN</text><text class="sans title" x="23" y="35">exploiter</text><text class="sans sub" x="23" y="48" fill="#aab4e6">chains · gated</text></g>
+  <g transform="translate(1004,272)"><rect width="152" height="56" rx="12" fill="url(#ng)" stroke="rgba(148,163,184,.16)" filter="url(#ds)"/><rect x="10" y="11" width="3" height="34" rx="1.5" fill="#60a5fa"/><text class="mono tag" x="23" y="19" fill="#60a5fa">SONNET · PH5</text><text class="sans title" x="23" y="35">reporter</text><text class="sans sub" x="23" y="48">findings → report</text></g>
+  <g transform="translate(1192,272)"><rect width="152" height="56" rx="12" fill="url(#ngo)" stroke="rgba(129,140,248,.55)" filter="url(#dso)"/><rect x="10" y="11" width="3" height="34" rx="1.5" fill="#818cf8"/><text class="mono tag" x="23" y="19" fill="#a5b4fc">OPUS · PH6</text><text class="sans title" x="23" y="35">qa-auditor</text><text class="sans sub" x="23" y="48" fill="#aab4e6">PASS / BLOCK gate</text></g>
+
+  <!-- deliverable band -->
+  <rect x="56" y="498" width="1288" height="44" rx="11" fill="rgba(52,211,153,.055)" stroke="rgba(52,211,153,.4)" stroke-width="1.4"/>
+  <text x="80" y="525"><tspan class="mono deliver-k">DELIVERABLE</tspan><tspan class="mono deliver-p">   report.md · report.html · SARIF / Jira / DefectDojo · cross-engagement ledger</tspan></text>
+
+  <!-- legend (left-aligned to the recon column) -->
+  <circle cx="70" cy="573" r="5" fill="#141d2b" stroke="#60a5fa" stroke-width="1.4"/>
+  <text class="sans leg" x="82" y="577">sonnet — mechanical finders</text>
+  <circle cx="312" cy="573" r="5" fill="#1b1f33" stroke="#818cf8" stroke-width="1.4"/>
+  <text class="sans leg" x="324" y="577">opus — independent judgment</text>
+  <path d="M548,573 H578" fill="none" stroke="rgba(148,163,184,.55)" stroke-dasharray="1.5 5" stroke-width="1.7" stroke-linecap="round"/>
+  <text class="sans leg" x="586" y="577">feedback · retest loop</text>
+</svg>

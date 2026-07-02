@@ -28,6 +28,10 @@ separate agent tries to refute each one before it counts, and a separate QA gate
 blocks the report until it passes. Most tools produce hits; this produces verified
 findings.
 
+<p align="center">
+  <img src="docs/pipeline.svg" alt="Redan pipeline — scope gate to recon, model, parallel finders, refute-bias verifier, exploiter, reporter, QA gate, deliverable, with the retest ledger loop" width="920">
+</p>
+
 ## Quickstart
 
 1. **Open the repo in [Claude Code](https://docs.claude.com/en/docs/claude-code/overview)** — agents, skills, and hooks auto-register.
@@ -125,6 +129,7 @@ CLAUDE.md                                         full project instructions
 
 ## Documentation
 
+- **[docs/pipeline.svg](docs/pipeline.svg)** — the pipeline diagram (standalone SVG; embedded at the top of this README).
 - **[CLAUDE.md](CLAUDE.md)** — architecture, conventions, current state.
 - **[.claude/rules/](.claude/rules/)** — the doctrine: tradecraft, evidence standard, methodology, pitfalls, QA gate, rules of engagement.
 - **[tools/checks/README.md](tools/checks/README.md)** — the 78-tool catalog.
