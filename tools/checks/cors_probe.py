@@ -28,7 +28,9 @@ def check(url):
             continue
         acao = h.get("access-control-allow-origin") or ""
         acac = (h.get("access-control-allow-credentials") or "").lower()
-        reflected = (acao == origin) or (origin == "null" and acao.lower() == "null") or acao == "*"
+        # NOTE: acao=="*" is deliberately NOT "reflected" — a wildcard ACAO with Allow-Credentials:true
+        # is rejected by browsers (inert), so it must not fire the credentialed-read finding (pitfalls.md).
+        reflected = (acao == origin) or (origin == "null" and acao.lower() == "null")
         cred = acac == "true"
         if reflected and cred:
             findings.append({"id": "cors-reflected-with-credentials", "severity": "medium",

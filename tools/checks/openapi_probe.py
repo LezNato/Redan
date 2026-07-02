@@ -312,7 +312,7 @@ def classify(status, body, base_status, base_len, base_hash=None):
         or abs(delta) > 50
         or (base_hash is not None and body_hash is not None and body_hash != base_hash)
     )
-    if status == 500:
+    if status == 500 and base_status != 500:   # a 500 is a divergence only when the baseline wasn't already 500
         sig, suspect = "500_on_type_confusion", "validation gap / crash (CWE-20)"
     elif status and 200 <= status < 300 and base_status and base_status >= 400:
         sig, suspect = "2xx_where_baseline_blocked", "authz / validation gap"

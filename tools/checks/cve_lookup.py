@@ -52,8 +52,10 @@ def _osv_query(ecosystem, name, version, timeout=15):
             msg = e.read().decode("utf-8", "replace")[:200]
         except Exception:
             msg = str(e)
-        return {"vulns": [], "source": "osv", "coverage_gap": True, "transient": False,
-                "coverage_gap_reason": f"OSV HTTP {e.code}: {msg} —OSV does not cover this ecosystem; not 'no CVEs'"}
+        _transient = e.code == 429 or e.code >= 500   # rate-limit / server error is transient, NOT a coverage answer
+        return {"vulns": [], "source": "osv", "coverage_gap": True, "transient": _transient,
+                "coverage_gap_reason": (f"OSV HTTP {e.code}: {msg} — transient error, retry (not a coverage answer)" if _transient
+                                        else f"OSV HTTP {e.code}: {msg} —OSV does not cover this ecosystem; not 'no CVEs'")}
     except Exception as e:
         # transient (network/timeout): must NOT be cached as if it were an answer
         return {"vulns": [], "source": "osv", "coverage_gap": True, "transient": True,

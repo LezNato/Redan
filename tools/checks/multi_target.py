@@ -59,7 +59,7 @@ if __name__ == "__main__":
     ap.add_argument("--concurrency", type=int, default=None)
     a = ap.parse_args()
     if os.path.isfile(a.targets):
-        tlist = [l.strip() for l in open(a.targets, encoding="utf-8") if l.strip() and not l.startswith("#")]
+        tlist = [l.strip() for l in open(a.targets, encoding="utf-8") if l.strip() and not l.strip().startswith("#")]
     else:
         tlist = [t.strip() for t in a.targets.split(",") if t.strip()]
     print(json.dumps(run(tlist, a.deep, a.concurrency), indent=2))

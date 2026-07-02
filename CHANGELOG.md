@@ -4,6 +4,46 @@ All notable changes to Redan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/). Versions are git-tagged (`vX.Y.Z`).
 
+## [0.12.1] — 2026-07-02
+
+*QC hardening — a repo-wide adversarial bug/consistency sweep fixed 29 verified defects.* Patch — no
+new module, still **78 stdlib modules**; behaviour-compatible (FP reductions + chokepoint fixes).
+
+A 13-dimension multi-agent QC pass (logic / security / consistency / infra), each finding adversarially
+verified and then re-confirmed by hand against the source. 40 findings surfaced; 29 fixed here, 11
+deferred with a recorded fix.
+
+### Fixed — false-finding / FP reductions (the kit's cardinal sin)
+- **`lfi_probe`**: file/PHP-source markers are subtracted against the baselines — a page that STATICALLY
+  renders passwd-format text no longer yields a false "LFI CONFIRMED".
+- **`upload_probe`**: acceptance gates on the body (a 2xx carrying a rejection message is not "upload allowed").
+- **`param_probe`**: reflection tests the injected sentinel VALUE, not the param NAME (often a common word).
+- **`cors_probe`**: wildcard `ACAO:*` + credentials is no longer flagged credentialed-read (browsers reject it).
+- **`soap_probe`**: error-based SQLi anchored to real DB-error signatures + downgraded HIGH→medium LEAD.
+- **`openapi_probe`**: a 500 counts as divergence only when the operation baseline wasn't already 500.
+- **`clickjack_probe`**: `frame-ancestors *` is correctly frameable (was a false negative via a dead var).
+- **`origin_discover`**: SAN keep is dot-boundary anchored; "serves site directly" needs a real fingerprint, not bare `<html>`.
+- **`waf_bypass`/`xss_scan`/`subdomain_enum`/`host_intel`/`multi_target`**: control-in-variant-set, bare-`<`-in-attr, over-broad `error` substring, dead `" envoy"` token, unstripped-comment target.
+
+### Fixed — security & integrity chokepoints
+- **`replay --redact`** now redacts the response body (the ternary had two identical branches).
+- **`redact`** gained a Stripe secret-key pattern (`sk_live_`/`rk_live_`/`sk_test_`).
+- **`mutation-gate`** catches PowerShell-native HTTP mutations (Invoke-WebRequest/RestMethod) + curl `--header` auth, and gates a cd-first bespoke-PoC run.
+- **`scope-gate`** fails CLOSED when `enforce_allowlist:true` but `in_scope` is empty.
+- **`xxe_probe`/`soap_probe`** OOB collaborators bind all-interfaces so an external target's callback can land (127.0.0.1 = false-clean for real blind XXE).
+
+### Fixed — infra / correctness
+- **`cve_lookup`**: OSV 429/5xx classified transient (retry), not cached as a permanent coverage gap.
+- **`h2_smuggle`**: guarded the time-parse against a curl-missing 'ERR' string (was an uncaught crash).
+- **`proxy_rotate --insecure`** now applies (CERT_NONE was never wired to the opener).
+- **`nuclei_scan`/`sqlmap_run`**: `localhost→127.0.0.1` is host-aware (no longer corrupts `localhost.x`).
+- **`render_report`**: info scoreboard count includes `informational[]` (matches `finding_schema`).
+- doc/comment drift in `_stealth`, `sri_check`, `tests/run_all.py`.
+
+Deferred (tracked, need design care): CSRF verdict-vs-Origin-check, nosql/rate-limit baseline+re-fire,
+websocket rejecting-control, OOB Windows pipe-poll, framework non-200 calibration, dns_email
+query-fail-vs-absent, scope-gate FILE_EXT-vs-real-TLD, the claude-in-chrome scope matcher.
+
 ## [0.12.0] — 2026-07-02
 
 *flow_map surfaces the business-logic invariants that aren't param-shaped.* Minor — no new module,

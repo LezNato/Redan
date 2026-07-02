@@ -114,7 +114,9 @@ def _post_file(url, field, filename, ctype, body, method, headers, extra_data, t
 def _accepted(status, body):
     if status is None:
         return False
-    return 200 <= status < 300
+    # a 2xx alone is not acceptance — a 200 that carries a rejection message ("not allowed",
+    # "invalid type", …) is a REJECT, not an upload-no-filtering finding. Gate on the body too.
+    return 200 <= status < 300 and not (body and REJECT_RE.search(body))
 
 
 def _paths(body):

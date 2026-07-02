@@ -55,7 +55,7 @@ def run(url, method, param, payload, block_marker):
             s, b = send(url, method, param, val)
         blocked = (s == 403) or (bm and bm in (b or "").lower())
         results.append({"variant": label, "status": s, "blocked": blocked, "len": len(b or "")})
-        if not blocked and s and 200 <= s < 500:
+        if label != "original" and not blocked and s and 200 <= s < 500:  # 'original' is the control, not a bypass
             bypasses.append(label)
     return {"target": url, "ok": True, "payload": payload, "param": param, "block_marker": block_marker,
             "baseline_status": s0, "variants": results, "bypass_variants": bypasses,

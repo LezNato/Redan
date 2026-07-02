@@ -3,8 +3,9 @@
 
 Additional stealth for the detection-footprint-conscious: rotating browser UAs,
 jittered inter-request timing, header-order randomization, proxy/egress rotation.
-This module is the opt-in stealth layer; it is scaffolded and NOT yet wired into any
-tool (no --stealth flag exists yet).
+This module is the shared stealth layer. `ua()` and `proxy()` ARE wired into `_http` (the
+shared client/egress chokepoint), so they run on every deterministic-tool request that goes
+through it; `jitter()` and `shuffled_headers()` remain opt-in scaffolding (no --stealth flag yet).
 
   ua()               -> a realistic desktop browser UA (NOT a beacon)
   jitter(lo=0.2, hi=1.5) -> sleep a random float seconds (inter-request pacing)

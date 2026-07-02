@@ -30,10 +30,12 @@ COMMON_PARAMS = [
 
 def probe(url, param, method, baseline_len, baseline_status, ctx, threshold):
     sep = "&" if "?" in url else "?"
-    test_url = f"{url}{sep}{param}=redan_{hashlib.md5(param.encode()).hexdigest()[:6]}"
+    marker = f"redan_{hashlib.md5(param.encode()).hexdigest()[:6]}"   # a payload-unique sentinel VALUE
+    test_url = f"{url}{sep}{param}={marker}"
     try:
         if method == "POST":
-            data = urllib.parse.urlencode({param: f"redan_{param}"}).encode()
+            marker = f"redan_{param}"
+            data = urllib.parse.urlencode({param: marker}).encode()
             req = urllib.request.Request(url, data=data, method="POST")
         else:
             req = urllib.request.Request(test_url)
@@ -41,7 +43,7 @@ def probe(url, param, method, baseline_len, baseline_status, ctx, threshold):
         with urllib.request.urlopen(req, context=ctx, timeout=15) as r:
             body = r.read(50000)
             status, length = r.status, len(body)
-            reflected = param.encode() in body
+            reflected = marker.encode() in body   # the injected VALUE reflecting, not the param NAME (often a common word)
             if abs(length - baseline_len) > threshold or status != baseline_status or reflected:
                 return {"param": param, "status": status, "length_delta": length - baseline_len, "reflected": reflected, "interesting": True}
     except urllib.error.HTTPError as e:

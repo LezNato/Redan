@@ -34,7 +34,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 _CTX = ssl.create_default_context(); _CTX.check_hostname = False; _CTX.verify_mode = ssl.CERT_NONE
 OOB_HITS = []
-SQL_ERR = re.compile(r"\b(sql|syntax|mysql|oracle|odbc|jdbc|postgresql|sqlite|ORA-\d{4,}|microsoft (?:sql|ole db)|(?:mariadb|postgres))\b", re.I)
+# anchored DB-error signatures only — bare 'sql'/'syntax'/'mysql' match benign text ("powered by MySQL",
+# a generic/XML 'syntax' fault) and manufacture a false SQLi. Error-based signal is a LEAD, not HIGH.
+SQL_ERR = re.compile(
+    r"(you have an error in your sql syntax|unclosed quotation mark|quoted string not properly terminated"
+    r"|ORA-\d{4,}|SQLSTATE\[|SQLException|PDOException|PG::\w+Error|near\s+\"[^\"]*\":\s*syntax error"
+    r"|supplied argument is not a valid mysql|mysql_fetch|mysqli?_\w+\(\)|microsoft (?:sql server|ole db)"
+    r"|odbc\s+(?:sql server )?driver|sqlite3?\.\w+error|warning:\s*(?:mysqli?|pg_|oci_|mssql))", re.I)
 PASSWD = re.compile(r"root:x:0:|daemon:|nobody:|/bin/(?:ba)?sh|bin:x:", re.I)  # redact-allow: /etc/passwd detector regex, not a secret
 WININI = re.compile(r"\[fonts\]|\[extensions\]|for 16-bit", re.I)
 
@@ -52,7 +58,7 @@ class _Collab(BaseHTTPRequestHandler):
 
 
 def _start_collab(port):
-    srv = ThreadingHTTPServer(("127.0.0.1", port), _Collab)
+    srv = ThreadingHTTPServer(("0.0.0.0", port), _Collab)   # bind all-ifaces so an EXTERNAL target's OOB callback can land (matches oob.py); 127.0.0.1 = false-clean for real blind XXE
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     return srv, srv.server_address[1]
 
@@ -178,8 +184,8 @@ def test_operation(endpoint, tns, operation, param, collab_url, timeout):
     out["tests"].append({"id": "sqli-error", "status": s_err, "confirmed": err_hit,
                          "body_snippet": (b_err or "")[:140].replace("\n", " ")})
     if err_hit:
-        out["findings"].append({"id": "soap-sqli", "severity": "high",
-                                "detail": f"SOAP operation '{operation}' param '{param}' returned a SQL error on a quote — SQL injection surface (CWE-89). Confirm boolean/time-based."})
+        out["findings"].append({"id": "soap-sqli", "severity": "medium",
+                                "detail": f"SOAP operation '{operation}' param '{param}' returned a DB error signature on a quote — SQL injection LEAD (error-based, CWE-89). NOT confirmed: demonstrate query control with a boolean/time-based control before rating higher."})
     # boolean: benign 'redan' vs always-true
     s_bool, b_bool = _post(endpoint, _envelope(tns, operation, param, "redan' OR '1'='1"), timeout)
     bool_diff = (sb == s_bool and abs(len(b_bool) - len(bb)) > 50 and b_bool != bb and parses)

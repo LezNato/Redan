@@ -31,7 +31,10 @@ def scan(url, severity="medium,high,critical", tags=None, rate=50, timeout=900):
     nb = find_nuclei()
     if not nb:
         return {"ok": False, "error": "nuclei not found (tools/external/nuclei.exe, $NUCLEI_BIN, or PATH); run tools/external/bootstrap.py"}
-    url = url.replace("//localhost", "//127.0.0.1")  # nuclei's resolver doesn't know 'localhost'
+    import urllib.parse as _up  # host-aware: rewrite ONLY when the host is exactly 'localhost' (not localhost.evil.com)
+    _sp = _up.urlsplit(url)
+    if _sp.hostname == "localhost":  # nuclei's resolver doesn't know 'localhost'
+        url = _up.urlunsplit(_sp._replace(netloc=_sp.netloc.replace("localhost", "127.0.0.1", 1)))
     cmd = [nb, "-target", url, "-jsonl", "-silent", "-no-color", "-disable-update-check",
            "-severity", severity, "-rate-limit", str(rate)]
     if tags:

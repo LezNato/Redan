@@ -57,7 +57,8 @@ def is_executable(payload, context):
     if context == "script":
         return True                                  # already inside a JS context
     if context == "attr":
-        return ('"' in payload) or ("'" in payload) or ("<" in payload)
+        # a quote is needed to break OUT of a quoted attribute value; a bare `<` stays literal inside it
+        return ('"' in payload) or ("'" in payload)
     return "<" in payload                            # html text: need to open a tag
 
 

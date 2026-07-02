@@ -56,6 +56,7 @@ P = [
     ("github-token", "secret", re.compile(r'\bgh[posru]_[A-Za-z0-9]{30,}\b|\bgithub_pat_[A-Za-z0-9_]{22,}\b'), '[REDACTED:gh-token]'),
     ("google-api-key", "secret", re.compile(r'\bAIza[0-9A-Za-z_\-]{35}\b'), '[REDACTED:google-key]'),
     ("slack-token", "secret", re.compile(r'\bxox[baprs]-[A-Za-z0-9\-]{10,}\b'), '[REDACTED:slack-token]'),
+    ("stripe-secret-key", "secret", re.compile(r'\b[rs]k_(?:live|test)_[0-9A-Za-z]{16,}\b'), '[REDACTED:stripe-key]'),
     ("private-key-block", "secret",
      re.compile(r'-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----.*?-----END (?:[A-Z0-9 ]+ )?PRIVATE KEY-----', re.S),
      '[REDACTED:private-key]'),

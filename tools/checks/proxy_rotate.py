@@ -53,7 +53,8 @@ def _fetch_list(source, timeout=20):
 
 def _test(proxy, target, timeout, verify):
     ph = urllib.request.ProxyHandler({"http": "http://" + proxy, "https": "http://" + proxy})
-    op = urllib.request.build_opener(ph)
+    https = urllib.request.HTTPSHandler(context=(ssl.create_default_context() if verify else _CTX))  # --insecure now actually applies CERT_NONE
+    op = urllib.request.build_opener(ph, https)
     t0 = time.perf_counter()
     try:
         r = op.open(urllib.request.Request(target, headers={"User-Agent": UA}), timeout=timeout)

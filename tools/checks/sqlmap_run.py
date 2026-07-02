@@ -22,7 +22,10 @@ def run(url, data=None, param=None, level=1, risk=1, technique="BEU", threads=4,
     sm = find_sqlmap()
     if not sm:
         return {"ok": False, "error": "sqlmap not found — run: python tools/external/bootstrap.py --sqlmap"}
-    url = url.replace("//localhost", "//127.0.0.1")
+    import urllib.parse as _up  # host-aware: rewrite ONLY when the host is exactly 'localhost' (not localhost.evil.com)
+    _sp = _up.urlsplit(url)
+    if _sp.hostname == "localhost":
+        url = _up.urlunsplit(_sp._replace(netloc=_sp.netloc.replace("localhost", "127.0.0.1", 1)))
     outdir = tempfile.mkdtemp(prefix="sqlmap-")
     cmd = [sys.executable, sm, "-u", url, "--batch", "--disable-coloring", "-v", "0",
            "--level", str(level), "--risk", str(risk), "--technique", technique,

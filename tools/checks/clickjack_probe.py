@@ -26,8 +26,9 @@ def check(url, action_label):
     # frameable = no XFO (DENY/SAMEORIGIN) AND no CSP frame-ancestors that excludes all
     blocked_by_xfo = any(k in xfo for k in ("DENY", "SAMEORIGIN"))
     blocked_by_csp = bool(fa) and not re.search(r"\*", fa_val) and "self" not in (fa_val or "").lower().split()
-    # 'frame-ancestors none' or a specific-allowlist also blocks; only truly absent = frameable
-    frameable = not blocked_by_xfo and not fa
+    # 'frame-ancestors none' or a specific-allowlist blocks; `frame-ancestors *` permits any origin
+    # (still clickjackable) — use the computed blocked_by_csp, not the bare presence of `fa`.
+    frameable = not blocked_by_xfo and not blocked_by_csp
     poc = ""
     if frameable:
         label = action_label or "Click to win"

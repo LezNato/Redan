@@ -193,6 +193,12 @@ def test_payload(url, param, payload, family, method, data_tmpl, ctx, timeout,
 
     # --- Signal 1: plaintext file markers (unix/win) ---
     file_hits = _grep_markers(body, family) if family in ("unix", "win") else []
+    if file_hits:
+        # payload-INDUCED only: a marker already present in the benign/random baselines (a page that
+        # STATICALLY renders passwd/win.ini-format text) is not an LFI — mirror ssti_probe's baseline
+        # exclusion (`'49' not in baseline_text`). Without this a static-marker page = false CONFIRMED.
+        _base_markers = set(_grep_markers(baseline_body, family)) | set(_grep_markers(rand_body, family))
+        file_hits = [h for h in file_hits if h not in _base_markers]
     # --- Signal 2: base64 source disclosure (php filter) ---
     decoded = None
     php_hits = []

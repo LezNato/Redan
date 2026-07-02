@@ -48,7 +48,7 @@ def check(url, html_override=None):
     findings = []
     if missing:
         findings.append({"id": "missing-sri-third-party-scripts", "severity": "low",
-                         "detail": f"{len(missing)} cross-origin script(s) loaded WITHOUT Subresource Integrity. Combined with no CSP this is a supply-chain / cookie-theft exposure (a compromised CDN -> arbitrary JS in the page's origin, uncontained).",
+                         "detail": f"{len(missing)} cross-origin script(s) loaded WITHOUT Subresource Integrity — a supply-chain / cookie-theft exposure (a compromised CDN -> arbitrary JS in the page's origin). Impact is uncontained only if CSP is also absent; header CSP is invisible from an HTML fetch, so confirm via http_headers.py.",
                          "scripts": [s["src"] for s in missing], "cookie_reading": cookie_scripts,
                          "csp_meta_present": has_csp_meta,
                          "note": "header CSP not visible from an HTML fetch — confirm via http_headers.py; no-CSP + missing-SRI + a cookie-reading script is the F-10 condition"})

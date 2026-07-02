@@ -49,7 +49,7 @@ def crtsh(domain):
         for row in json.load(r):
             for n in str(row.get("name_value", "")).split("\n"):
                 n = n.strip().lstrip("*.").lower()
-                if n.endswith(domain):
+                if n == domain or n.endswith("." + domain):   # dot-boundary: 'notredan.com' is NOT a subdomain of 'redan.com'
                     names.add(n)
         return sorted(names)
     except Exception:
@@ -102,7 +102,9 @@ def discover(domain):
     # 4) probe likely-origin candidates directly
     def probe(ip):
         st, srv, snip = fetch_raw(ip, domain)
-        serves = bool(st and st < 500 and ("wordpress" in snip.lower() or "<html" in snip.lower()
+        # require a REAL fingerprint match (site marker OR the edge Server banner) — a bare '<html' matches
+        # nearly every web response (cPanel/nginx welcome, an HTML 4xx) => false 'origin-exposed-bypassing-waf'.
+        serves = bool(st and st < 500 and ("wordpress" in snip.lower()
                                            or (edge_server and srv and srv.split("/")[0] == edge_server.split("/")[0])))
         return {"ip": ip, "names": ip_map.get(ip, []), "status": st, "server": srv,
                 "serves_site_directly": serves, "snippet": snip}

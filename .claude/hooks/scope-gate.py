@@ -200,6 +200,9 @@ def main():
             deny(f"{host}: no readable scope.yaml — refusing active reach to an external host "
                  f"(fail-closed). Create scope.yaml with this target in_scope before active testing.")
         # 4) optional strict allowlist
+        if enforce and not in_scope:
+            deny(f"{host}: enforce_allowlist is on but in_scope is empty/unparsed — refusing external reach "
+                 f"(fail-closed). Populate in_scope in scope.yaml before active testing.")
         if enforce and in_scope:
             if not any(host_matches(host, e) for e in in_scope):
                 deny(f"{host} is not in in_scope and enforce_allowlist is on. Add it to scope.yaml to proceed.")

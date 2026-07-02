@@ -107,7 +107,7 @@ def src_hackertarget(domain):
     raw = _get("https://api.hackertarget.com/hostsearch/?q=" + domain)
     if raw is None:
         return set(), "error"
-    if "API count exceeded" in raw or "error" in raw.lower():
+    if "API count exceeded" in raw or raw.strip().lower().startswith("error"):
         return set(), "rate_limited"
     out = set()
     for line in raw.splitlines():

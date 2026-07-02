@@ -33,13 +33,22 @@ def probe_h2c(url, timeout):
             "findings": [{"id": "h2c-upgrade-enabled", "severity": "medium",
                           "detail": "the server/proxy accepts h2c upgrade (101) — an attacker can tunnel HTTP/2 over an HTTP/1.1 connection, bypassing front-end ACLs/inspection (CWE-444)"}] if upgraded else []}
 
+def _last_time(s):
+    """Trailing time token of a '<status> <time>' curl line; 0.0 on any error (e.g. an 'ERR ...' string)."""
+    try:
+        p = (s or "").split()
+        return float(p[-1]) if len(p) >= 2 else 0.0
+    except (ValueError, IndexError):
+        return 0.0
+
+
 def probe_h2cl(url, timeout):
     # H2.CL timing: H2 POST with Content-Length: 0 but a real body -> does the server desync?
     control = curl(["--http2", "-X", "POST", "-d", "control-body", url], timeout)
     cl_anom = curl(["--http2", "-X", "POST", "-H", "Content-Length: 0", "-d", "smuggle-body", url], timeout)
     # a timing/status differential suggests the server processed the anomaly differently (potential desync)
-    control_t = float(control.split()[-1]) if control and len(control.split()) >= 2 else 0
-    anom_t = float(cl_anom.split()[-1]) if cl_anom and len(cl_anom.split()) >= 2 else 0
+    control_t = _last_time(control)
+    anom_t = _last_time(cl_anom)
     control_code = control.split()[0] if control else "ERR"
     anom_code = cl_anom.split()[0] if cl_anom else "ERR"
     suspicious = (abs(anom_t - control_t) > 2.0) or (control_code != anom_code)

@@ -43,7 +43,7 @@ def _fail_lines(text):
 
 def main():
     results = []  # (name, ok, output)
-    if "--no-lint" not in sys.argv:  # CI runs doctrine_lint as its own step (see tests.yml)
+    if "--no-lint" not in sys.argv:  # CI runs this same single step WITHOUT --no-lint, so lint runs inline; --no-lint is for a tests-only local run
         ok, text = run("doctrine_lint", [sys.executable, "tools/checks/doctrine_lint.py"])
         results.append(("doctrine_lint (self-audit)", ok, text))
     for t in sorted(glob.glob(os.path.join(HERE, "test_*.py"))):

@@ -38,7 +38,7 @@ def lookup(ip, timeout=15):
         return {"target": ip, "ok": False, "error": str(e), "findings": []}
     cpes = d.get("cpes", [])
     findings = []
-    notable = [c for c in cpes if any(k in c.lower() for k in ("openresty", "nginx", "apache", "php:", "iis", "haproxy", " envoy"))]
+    notable = [c for c in cpes if any(k in c.lower() for k in ("openresty", "nginx", "apache", "php:", "iis", "haproxy", "envoy"))]
     if notable:
         findings.append({"id": "versioned-edge-product", "severity": "info",
                          "detail": "versioned edge/server product(s) on the host — cross-check against version-bound CVEs: " + "; ".join(notable[:6])})

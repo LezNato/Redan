@@ -29,7 +29,7 @@ class Collab(BaseHTTPRequestHandler):
         self.wfile.write(b"ok")
 
 def start_collab(port=0):
-    srv = ThreadingHTTPServer(("127.0.0.1", port), Collab)
+    srv = ThreadingHTTPServer(("0.0.0.0", port), Collab)   # bind all-ifaces so an EXTERNAL target's OOB callback can land (matches oob.py); 127.0.0.1 = false-clean for real blind XXE
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     return srv, srv.server_address[1]
 

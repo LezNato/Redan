@@ -28,7 +28,8 @@ def fire(step, verify=True, cookie_jar=None):
     data = None
     h = {"User-Agent": UA, "Accept": "*/*"}; h.update(step.get("headers", {}))
     if body is not None:
-        if "Content-Type" in {k.lower() for k in h} and "json" not in h.get("Content-Type", "").lower():
+        _ct = next((v for k, v in h.items() if k.lower() == "content-type"), "")   # case-insensitive lookup
+        if _ct and "json" not in _ct.lower():
             import urllib.parse as up; data = up.urlencode(body).encode()
         else:
             h.setdefault("Content-Type", "application/json"); data = json.dumps(body).encode()

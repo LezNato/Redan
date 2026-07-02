@@ -42,7 +42,12 @@ Usage:
         [--reauth-header "Authorization: Bearer FRESH"] [--reauth-cookie "s=FRESH"]
         [--normalize date,set-cookie,csrf-token,etag] [--redact] [--insecure] [--timeout 15]
 """
-import sys, json, re, ssl, hashlib, argparse, urllib.request, urllib.error, urllib.parse
+import os, sys, json, re, ssl, hashlib, argparse, urllib.request, urllib.error, urllib.parse
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    from redact import redact_text as _redact_text   # response-body redaction chokepoint for --redact
+except Exception:
+    _redact_text = None
 
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 _CTX = ssl.create_default_context(); _CTX.check_hostname = False; _CTX.verify_mode = ssl.CERT_NONE
@@ -202,7 +207,7 @@ def run(transcript_path, target, want_diff, reauth_header, reauth_cookie, normal
            "response_observed": {"status": status,
             "headers": ({k: _mask(k, v) for k, v in resp_headers.items()} if redact else resp_headers),
             "body_len": len(resp_body or ""),
-            "body": (resp_body[:300] if redact else resp_body[:300])}}
+            "body": (_redact_text(resp_body[:300])[0] if (redact and _redact_text) else resp_body[:300])}}
 
     if expected is None or not want_diff:
         out["mode"] = "replay-only (no expected response to diff)"

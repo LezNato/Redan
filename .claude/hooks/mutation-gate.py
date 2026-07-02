@@ -47,8 +47,14 @@ def is_auth_mutation(cmd):
         return True
     # curl authenticated mutation: a mutating -X/-d AND an auth carrier
     curl_mut = re.search(r'-X\s*' + MUT, c, re.I) or (re.search(r'\bcurl\b', c) and re.search(r'(?<!\w)-d\b|--data', c))
-    has_auth = re.search(r'-b\s|--cookie|-H\s*["\']?\s*(Cookie|Authorization)', c, re.I)
+    has_auth = re.search(r'-b\s|--cookie|(?:-H|--header)\s*["\']?\s*(Cookie|Authorization)', c, re.I)
     if re.search(r'\bcurl\b', c) and curl_mut and has_auth:
+        return True
+    # PowerShell-native HTTP mutation (the primary shell): Invoke-WebRequest/RestMethod / iwr / irm
+    # with a mutating -Method AND an auth carrier (-Headers Authorization/Cookie / -WebSession / -Credential / -Token)
+    ps_mut = re.search(r'\b(?:Invoke-WebRequest|Invoke-RestMethod|iwr|irm)\b', c, re.I) and re.search(r'-Method\s+' + MUT, c, re.I)
+    ps_auth = re.search(r'-Headers\b[^\n]*(?:Authorization|Cookie)|-WebSession\b|-Credential\b|-Token\b', c, re.I)
+    if ps_mut and ps_auth:
         return True
     return False
 
@@ -56,7 +62,9 @@ def is_exploit_dev_run(cmd):
     """A command running a `.py` under a real engagement's exploit-dev/ scratch dir = the
     bespoke-PoC lane (active exploitation). The committed `_template/exploit-dev/` scaffold is
     NOT gated — it carries only a placeholder target (so py_compile / smoke tests still run)."""
-    if not re.search(r'exploit-dev[\\/]\S*\.py', cmd):
+    # gate the PoC even when invoked cd-first (`cd .../exploit-dev && python poc.py`): require an
+    # exploit-dev path reference AND a python/.py invocation — not the two contiguous in one token.
+    if not (re.search(r'exploit-dev', cmd) and re.search(r'\.py\b|\bpython\b', cmd, re.I)):
         return False
     if re.search(r'_template[\\/]exploit-dev', cmd):  # the harmless committed scaffold
         return False
