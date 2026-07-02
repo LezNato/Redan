@@ -4,6 +4,38 @@ All notable changes to Redan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/). Versions are git-tagged (`vX.Y.Z`).
 
+## [0.12.2] — 2026-07-02
+
+*QC hardening round 2 — the 11 deferred findings resolved (10 fixed, 1 declined with rationale).*
+Patch — no new module, still **78 stdlib modules**; behaviour-compatible.
+
+### Fixed
+- **`csrf_probe`**: "CSRF CONFIRMED" now requires a token was actually located+stripped AND the
+  wrong-Origin control was NOT rejected — an Origin/Referer-validated endpoint, or a run where no token
+  was found to strip, downgrades to a LEAD (was a false CONFIRMED).
+- **`nosql_probe`**: the `$where` timing signal is baseline-relative (not an absolute 2.5s) and is
+  re-fired SERIALLY to confirm the delay reproduces (concurrency inflated it → false timing lead).
+- **`rate_limit_test`**: throttle body-markers must be payload-INDUCED — a marker already on the
+  baseline (e.g. a persistent captcha) no longer reads as an active rate limit.
+- **`websocket_probe`**: dropped the "spoofed Authorization" FP (an operator-supplied token → 101 is
+  expected); a cross-origin handshake is now a CSWSH precondition gated on ambient cookie auth (medium
+  with `--cookie`, else info).
+- **`framework_fingerprint`**: a uniform non-200 shell (an edge that 403s/401s every path) is now
+  detected by body-match, so it no longer reports 7 mutually-exclusive frameworks as HIGH.
+- **`oob.py`**: the interactsh poll uses a daemon reader thread instead of `select()` on a pipe (which
+  raises OSError on Windows → a silent false-clean for blind SSRF/XXE).
+- **`dns_email`**: NXDOMAIN no longer reports the resolver's own IP as the target's A record; a
+  CAA/DNSSEC lookup that could not complete (DoH blocked) is reported "unknown", not a false "missing".
+- **`scope-gate`/`settings.json`**: the scope matcher + gating list now cover the claude-in-chrome
+  `tabs_create` / `browser_batch` URL-reaching tools.
+
+### Reviewed & declined (a documented trade-off, not a defect)
+- **scope-gate FILE_EXT** (sweep finding #23): the denylist is provably NOT bypassed — no `out_of_scope`
+  pattern ends in a file extension, and URL/IPv4 targets are always extracted regardless of FILE_EXT;
+  only a contrived scheme-less host on a file-extension TLD under `enforce_allowlist` is affected, and
+  the naive fix reintroduces the file-name false-positive that once blocked the toolkit's own commands.
+  Left as-is by design (see the code comment at scope-gate.py:100-107).
+
 ## [0.12.1] — 2026-07-02
 
 *QC hardening — a repo-wide adversarial bug/consistency sweep fixed 29 verified defects.* Patch — no

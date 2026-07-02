@@ -25,8 +25,8 @@ import sys, json, re, ipaddress, os, urllib.parse
 # *navigate tools, the request-issuing browser tools (network_request / evaluate
 # / run_code / javascript) are gated too — they can fetch an out-of-scope host.
 GATED_EXACT = {"Bash", "PowerShell", "WebFetch"}
-GATED_SUBSTR = ("navigate", "network_request", "browser_evaluate",
-                "browser_run_code", "javascript_tool")
+GATED_SUBSTR = ("navigate", "network_request", "browser_evaluate", "browser_run_code",
+                "javascript_tool", "tabs_create", "browser_batch")
 def is_gated(tool_name: str) -> bool:
     if tool_name in GATED_EXACT:
         return True

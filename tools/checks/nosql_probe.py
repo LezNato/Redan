@@ -35,12 +35,15 @@ PAYLOADS = [
 DELAY_S = 2.5
 
 
-def test(url, param, payload_str, desc):
+def test(url, param, payload_str, desc, baseline_elapsed=0.0):
     val = json.loads(payload_str)  # FIX: real object/value, not a quoted string
     body = json.dumps({param: val}).encode()
     r = post(url, data=body, headers={"Content-Type": "application/json"}, timeout=30)
+    # baseline-RELATIVE delay floor — a legitimately slow endpoint (or a big $ne:null result) must not
+    # read as a $where sleep: exceed both the absolute floor AND ~2x the benign baseline + margin.
+    floor = max(DELAY_S, baseline_elapsed * 2 + 1.5)
     out = {"desc": desc, "payload": payload_str, "time_s": round(r.elapsed, 2),
-           "delayed": r.elapsed > DELAY_S}
+           "delayed": r.elapsed > floor}
     if r.error:
         out["error"] = r.error
         return out
@@ -76,16 +79,26 @@ def main():
                 headers={"Content-Type": "application/json"}, timeout=15)
     baseline_len = 0 if base.error else len(base.text)
     baseline_status = 0 if base.error else base.status
+    baseline_elapsed = 0.0 if base.error else base.elapsed
 
     results = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.concurrency) as pool:
-        futures = {pool.submit(test, args.url, args.param, p[1], p[2]): p[0] for p in PAYLOADS}
+        futures = {pool.submit(test, args.url, args.param, p[1], p[2], baseline_elapsed): p[0] for p in PAYLOADS}
         for fut in concurrent.futures.as_completed(futures):
             r = fut.result()
             r["label"] = futures[fut]
             r["baseline_len"] = baseline_len
             r["baseline_status"] = baseline_status
             results.append(r)
+    # timing re-confirmation: a delay seen under CONCURRENCY can be contention noise — re-fire any delayed
+    # payload SERIALLY and require the delay to REPRODUCE before it counts (mirrors cmd_inject's discipline).
+    for r in results:
+        if r.get("delayed"):
+            pay = next((p[1] for p in PAYLOADS if p[0] == r["label"]), None)
+            r2 = test(args.url, args.param, pay, r["desc"], baseline_elapsed) if pay else {"delayed": False}
+            r["refire_time_s"] = r2.get("time_s")
+            r["timing_reproduced"] = bool(r2.get("delayed"))
+            r["delayed"] = bool(r.get("delayed") and r2.get("delayed"))
     results.sort(key=lambda x: x.get("time_s", 0), reverse=True)
     leads = [r for r in results if is_lead(r, baseline_len, baseline_status)]
     print(json.dumps({

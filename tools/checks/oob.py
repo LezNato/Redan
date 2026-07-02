@@ -41,6 +41,8 @@ class Collab:
         self._proc = None
         self._interact_domain = None
         self._tmpdir = None
+        self._interactions = []                 # interactsh interaction lines, filled by a reader thread
+        self._interact_lock = threading.Lock()
 
     def _start_local(self):
         self._httpd = socketserver.TCPServer(("0.0.0.0", 0), _LocalHandler)
@@ -66,10 +68,24 @@ class Collab:
             line = self._proc.stdout.readline().decode("utf-8", "replace")
             m = re.search(r"([a-z0-9]{20,}\.[a-z0-9.\-]+)", line)
             if m:
-                self._interact_domain = m.group(1); return True
+                self._interact_domain = m.group(1)
+                threading.Thread(target=self._interactsh_reader, daemon=True).start()
+                return True
         except Exception:
             pass
         return False
+
+    def _interactsh_reader(self):
+        # blocking readline in a daemon thread — platform-independent (select() on a pipe raises
+        # OSError on Windows, which silently made poll() always False = a false-clean for blind OOB).
+        try:
+            for raw in iter(self._proc.stdout.readline, b""):
+                line = raw.decode("utf-8", "replace")
+                if line:
+                    with self._interact_lock:
+                        self._interactions.append(line)
+        except Exception:
+            pass
 
     def start(self):
         if self.backend == "interactsh" and self._start_interactsh():
@@ -87,17 +103,9 @@ class Collab:
         if timeout:
             time.sleep(timeout)
         if self._mode == "interactsh":
-            # read the interactsh-client stdout for interaction records mentioning the marker
-            try:
-                self._proc.stdout.flush()
-                import select
-                while select.select([self._proc.stdout], [], [], 0)[0]:
-                    line = self._proc.stdout.readline().decode("utf-8", "replace")
-                    if marker in line:
-                        return True
-            except Exception:
-                pass
-            return False
+            # the reader thread accumulates interaction lines; check membership (platform-independent)
+            with self._interact_lock:
+                return any(marker in ln for ln in self._interactions)
         return any(marker in h for h in self._httpd.hits)
 
     def stop(self):

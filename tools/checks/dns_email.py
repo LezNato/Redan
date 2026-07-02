@@ -33,12 +33,15 @@ def doh(name, rtype, timeout=10):
                                     timeout=timeout) as r:
             return json.load(r).get("Answer") or []
     except Exception:
-        return []
+        return None   # query FAILED (distinct from a successful empty answer [])
 
 def addrs(domain):
     out = nslookup(domain)
-    # drop the resolver's own "Address:" line (appears before "Name:")
-    body = out.split("Name:", 1)[-1] if "Name:" in out else out
+    # a real answer carries a "Name:" section; NXDOMAIN / no-answer has none — return [] rather than
+    # matching the resolver's OWN "Address:" line (which would report the DNS server as the target's A).
+    if "Name:" not in out:
+        return []
+    body = out.split("Name:", 1)[-1]
     return sorted(set(re.findall(r"Address(?:es)?:\s*([0-9a-fA-F:.]+)", body)))
 
 def records(domain, rtype, pattern):
@@ -60,8 +63,10 @@ def check(domain):
         f_caa = ex.submit(doh, domain, "CAA")
         f_dnskey = ex.submit(doh, domain, "DNSKEY")
         a = f_a.result(); ns = f_ns.result(); mx = f_mx.result()
-        caa = [x.get("data", "") for x in f_caa.result() if x.get("type") == 257]
-        dnssec_signed = any(x.get("type") == 48 for x in f_dnskey.result())
+        caa_ans = f_caa.result(); dnskey_ans = f_dnskey.result()
+        caa = [x.get("data", "") for x in (caa_ans or []) if x.get("type") == 257]
+        dnssec_signed = any(x.get("type") == 48 for x in (dnskey_ans or []))
+        caa_failed = caa_ans is None; dnssec_failed = dnskey_ans is None   # query didn't complete (DoH blocked) != no record
         spf = next((t for t in f_txt.result() if t.lower().startswith("v=spf1")), None)
         dmarc_txt = next((t for t in f_dmarc.result() if t.lower().startswith("v=dmarc1")), None)
         dkim = [s for s in DKIM_SELECTORS
@@ -82,10 +87,16 @@ def check(domain):
     elif not re.search(r"[~\-]all\b", spf):
         findings.append({"id": "spf-weak", "severity": "low",
                          "detail": "SPF does not end in -all/~all"})
-    if not caa:
+    if caa_failed:
+        findings.append({"id": "caa-unknown", "severity": "info",
+                         "detail": "CAA lookup did not complete (DoH to dns.google blocked?) — could NOT verify; not asserting missing"})
+    elif not caa:
         findings.append({"id": "caa-missing", "severity": "low",
                          "detail": "no CAA record — any CA may issue certificates for this domain (defense-in-depth)"})
-    if not dnssec_signed:
+    if dnssec_failed:
+        findings.append({"id": "dnssec-unknown", "severity": "info",
+                         "detail": "DNSKEY lookup did not complete (DoH blocked?) — could NOT verify DNSSEC; not asserting unsigned"})
+    elif not dnssec_signed:
         findings.append({"id": "dnssec-unsigned", "severity": "low",
                          "detail": "zone is unsigned (no DNSKEY) — no DNS-response forgery protection (defense-in-depth)"})
     return {"target": domain, "ok": True, "a": a, "ns": ns, "mx": mx,

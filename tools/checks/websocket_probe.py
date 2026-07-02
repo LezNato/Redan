@@ -70,10 +70,16 @@ def probe(ws_url, origin, cookie, subprotocol, message, auth_header):
         head = resp.split(b"\r\n\r\n", 1)[0].decode("utf-8", "replace")
         out["handshake_response_head"] = head[:300]
         out["handshake_101"] = "101" in head.split("\r\n")[0]
-        # handshake-auth test: did it accept an arbitrary Origin / no-auth?
-        if (origin or auth_header) and out["handshake_101"]:
-            out["findings"].append({"id": "ws-handshake-permissive", "severity": "medium",
-                "detail": f"WS handshake SUCCEEDED with a spoofed {'Origin' if origin else 'Authorization'} ({origin or auth_header}) — handshake authz is weak (CWE-306); test message-level access next"})
+        # handshake-auth test. An operator-supplied Authorization that yields a 101 is EXPECTED (not a
+        # finding). A cross-origin Origin accepted is a CSWSH PRECONDITION — but only exploitable if the
+        # socket authenticates via ambient cookies; without --cookie there is nothing to hijack.
+        if origin and out["handshake_101"]:
+            if cookie:
+                out["findings"].append({"id": "ws-cross-origin-accepted", "severity": "medium",
+                    "detail": f"WS handshake with Origin {origin!r} SUCCEEDED on a cookie-authenticated socket — cross-site WebSocket hijacking precondition (CWE-346): a malicious page could open this socket with the victim's cookies. LEAD — confirm the socket acts on ambient session auth at the message level. Supply a genuinely cross-origin --origin."})
+            else:
+                out["findings"].append({"id": "ws-cross-origin-accepted-no-ambient-auth", "severity": "info",
+                    "detail": f"WS handshake accepted Origin {origin!r}, but no cookie/ambient auth was provided — not exploitable as CSWSH unless the socket authenticates via cookies. Re-test with --cookie + a cross-origin --origin."})
         if not out["handshake_101"]:
             out["findings"].append({"id": "ws-handshake-rejected", "severity": "info",
                 "detail": "WS handshake rejected — " + head.split("\r\n")[0]})

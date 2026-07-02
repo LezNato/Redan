@@ -72,17 +72,20 @@ def _req(url, method, data, headers, timeout, verify):
         return None, time.perf_counter() - t0, {}, str(e)
 
 
-def _is_throttle(status, body, markers, baseline_status):
-    """429 is definitive; 403/423/503 count only if they CHANGE mid-burst or carry
-    a marker (a uniformly-403 auth-required endpoint must NOT read as 'throttled')."""
+def _is_throttle(status, body, markers, baseline_status, baseline_body=""):
+    """429 is definitive; 403/423/503 count only if they CHANGE mid-burst or carry a NEW marker.
+    A marker already present on the BASELINE (e.g. a persistent captcha on the login page) is not a
+    rate-limit signal; a uniformly-403 auth-required endpoint must NOT read as 'throttled'."""
     b = (body or "").lower()
+    bb = (baseline_body or "").lower()
+    new_markers = [m for m in markers if m in b and m not in bb]   # payload-INDUCED markers only
     if status in THROTTLE_STATUS:
         return True
     if status in LOCK_STATUS and baseline_status not in LOCK_STATUS:
         return True
-    if status in LOCK_STATUS and any(m in b for m in markers):
+    if status in LOCK_STATUS and new_markers:
         return True
-    if any(m in b for m in markers):
+    if new_markers:
         return True
     return False
 
@@ -111,9 +114,9 @@ def run(url, method, data, headers, count, gap, concurrency, markers, timeout, v
         if ra and retry_after is None:
             retry_after = ra
         for m in markers:
-            if m in (b or "").lower() and m not in markers_hit:
+            if m in (b or "").lower() and m not in (bb or "").lower() and m not in markers_hit:
                 markers_hit.append(m)
-        if first_throttle is None and _is_throttle(s, b, markers, bs):
+        if first_throttle is None and _is_throttle(s, b, markers, bs, bb):
             first_throttle = i + 1
 
     if concurrency > 1:

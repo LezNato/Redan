@@ -237,13 +237,24 @@ def probe(args, ctx):
         note = ("A control 2xx and B strip 2xx look like missing enforcement, BUT a random path "
                 "returned the same 200 body -> the edge serves a uniform shell to non-JS clients. "
                 "Re-test through the browser channel before calling this CSRF.")
+    elif csrf_signal and not (tok or hdr_strip_name):
+        verdict = ("LEAD — no anti-CSRF token was located to strip, so the 'strip' request equalled the "
+                   "control (no real differential). Provide --token-name/--header, or the endpoint may rely "
+                   "on SameSite/Origin. NOT a confirmed CSRF.")
+        note = "Test B removed nothing; strip==control is trivially 'accepted'. Locate the token first."
+    elif csrf_signal and origin_checked:
+        verdict = ("LEAD — the token is not enforced, BUT the server validated Origin/Referer (the wrong-Origin "
+                   "request was REJECTED while the control succeeded). A cross-site browser request is blocked by "
+                   "that check, so this is not exploitable as CSRF unless the Origin check can be bypassed.")
+        note = ("Differential: control=%s, stripped=%s, wrong-Origin=%s (rejected). The missing token is moot "
+                "while Origin/Referer is enforced.") % (a_status, b_status, d_status)
     elif csrf_signal:
-        # doctrine-lint: allow CONFIRMED — paired-control proof: control WITH token succeeds and the
-        # stripped-token request is STILL accepted (differential), guarded above against the WAF/SPA
-        # uniform-shell false positive. The control makes non-enforcement decisive on this endpoint.
+        # doctrine-lint: allow CONFIRMED — paired-control proof: a token WAS located and removed, the stripped
+        # request is STILL accepted (real differential), the wrong-Origin control was NOT rejected, and the
+        # WAF/SPA uniform-shell FP is excluded above. Non-enforcement is decisive on this endpoint.
         verdict = "CSRF CONFIRMED — token stripped, action still accepted (token not enforced on this endpoint)"
-        note = ("Differential: control WITH token = %s, stripped-token = %s. The server accepted the "
-                "state change without the token. Rate honestly: login/logout CSRF ~Low; a security-"
+        note = ("Differential: control WITH token = %s, stripped-token = %s; wrong-Origin not rejected. The server "
+                "accepted the state change without the token. Rate honestly: login/logout CSRF ~Low; a security-"
                 "relevant change (email/password/permission) is higher.") % (a_status, b_status)
     elif not control_ok:
         verdict = "LEAD — control request (with token) did not return 2xx; cannot establish baseline"

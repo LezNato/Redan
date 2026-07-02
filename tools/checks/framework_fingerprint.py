@@ -186,10 +186,8 @@ def is_fallback_shell(status, body, fallbacks):
     for fstatus, fbs, _ in fallbacks:
         if status != fstatus:
             continue
-        if fstatus != 200:
-            # any matching non-200 status on a known-nonexistent shape is itself
-            # the "not found" behavior; only treat a 200 as the dangerous shell.
-            continue
+        # a UNIFORM shell can be non-200 too (an edge that 403s/401s EVERY path) — match by body at the
+        # same status, not only on 200; a route with a DISTINCT body at that status still reads as real.
         if bs[0] == fbs[0]:
             return True
         # length-based near-match (shell pages can vary slightly per request)
