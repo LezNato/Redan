@@ -4,6 +4,37 @@ All notable changes to Redan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/). Versions are git-tagged (`vX.Y.Z`).
 
+## [0.12.0] — 2026-07-02
+
+*flow_map surfaces the business-logic invariants that aren't param-shaped.* Minor — no new module,
+still **78 stdlib modules**; backward-compatible output.
+
+`flow_map`'s candidate-invariant classifier was param-name only, so it auto-surfaced the price/qty/
+status class of rules but never **separation-of-duties** ("can I approve my own request?") or
+**audit immutability** ("can I delete the audit trail?") — those are endpoint/method-level, not param-
+level. This adds an endpoint pass so the oracle hands the mapper ~4/5 of the classic fraud questions
+instead of ~2/5, still LEAD-ONLY and with no new network behaviour.
+
+### Added
+- **`flow_map._endpoint_invariants` — two endpoint-level candidate invariants.**
+  **`separation-of-duties`** on an approval-step endpoint (`/…/{id}/approve`, `/approve/{id}`, or a
+  step in a discovered flow) → the "approver ≠ creator" two-party control, tested via
+  `auth_request --funclevel`. **`append-only`** on an audit/immutable record (`/audit`, `/auditlog`) →
+  the "no role may DELETE/UPDATE this" rule, tested via `forbidden_bypass` method-swaps. Pure
+  classification over already-crawled data (no extra requests); RoE-neutral.
+- The token sets are deliberately **tight** (NOISE-LOW): `APPROVAL_TOKENS` keeps only unambiguous
+  two-party verbs (`approve`/`approval`/`signoff`/`countersign`/`ratify`) and excludes self-actor /
+  self-consent verbs that FP on high-volume routes (`publish`/`release`/`authorize`/`grant`/`endorse`);
+  `AUDIT_TOKENS` is `audit`/`auditlog` only (a real audit-trail is caught by `audit`; bare
+  `trail`/`journal`/`changelog` FP on blogs/diaries/docs pages). Each covered case has a true-positive
+  **and** a false-positive-rejection test (`test_flow_map.py`; new lab fixtures in `lab_server.py`).
+
+### Changed
+- `candidate_invariants` entries now carry a **`basis`** field (`param` \| `endpoint`); existing
+  param-level entries are unchanged except for `basis:"param"`, endpoint entries add `method` and a
+  null `param`. Backward-compatible — the recon/mapper agent reads the annotated
+  `business_process_map.json`, not these raw dicts.
+
 ## [0.11.1] — 2026-07-01
 
 *Retest rendering — partial-retest coverage honesty in the report delta.* Patch — no new module;

@@ -390,7 +390,15 @@ class Handler(BaseHTTPRequestHandler):
         # --- flow_map surface: a small multi-step business-process the mapper models ---
         if path == "/shop":              # checkout flow entry: a form with price/qty/coupon + links
             return self._send(200, '<html><body><a href="/register">register</a> '
-                              '<a href="/admin-orders">orders</a>'
+                              '<a href="/admin-orders">orders</a> '
+                              '<a href="/order/9/approve">approve</a> '
+                              '<a href="/approve/9">approve-rpc</a> '
+                              '<a href="/admin/auditlog">audit</a> '
+                              '<a href="/verify?token=x">verify</a> '
+                              '<a href="/login">login</a> '
+                              '<a href="/blog/9/publish">publish</a> '
+                              '<a href="/oauth/authorize">oauth</a> '
+                              '<a href="/changelog">changelog</a>'
                               '<form action="/checkout" method="post">'
                               '<input name="item"><input name="price"><input name="qty">'
                               '<input name="coupon"><input name="discount">'
@@ -402,6 +410,23 @@ class Handler(BaseHTTPRequestHandler):
                               '</form></body></html>')
         if path == "/admin-orders":      # a gated SENSITIVE path (flow_map access-matrix -> "gated")
             return self._json(403, {"error": "forbidden"})
+        # --- flow_map ENDPOINT-level invariant fixtures (SoD on approval step; append-only on audit) ---
+        if path == "/order/9/approve":   # TP SoD: 'approve' as a non-initial segment (acts on order 9)
+            return self._json(200, {"order": 9, "status": "approved"})
+        if path == "/approve/9":         # TP SoD: verb-first RPC approval acting on a resource id
+            return self._json(200, {"id": 9, "status": "approved"})
+        if path == "/admin/auditlog":    # TP append-only: an audit-record endpoint
+            return self._send(200, "<html><body>audit trail (read-only view)</body></html>")
+        if path == "/verify":            # FP-reject SoD: email-verification is not two-party approval
+            return self._send(200, "<html><body>email verified</body></html>")
+        if path == "/login":             # FP-reject append-only: 'login' must not hit audit 'log' (token boundary)
+            return self._send(200, "<html><body>please log in</body></html>")
+        if path == "/blog/9/publish":    # FP-reject SoD: self-publish (CMS) is single-actor, not two-party
+            return self._send(200, "<html><body>post published</body></html>")
+        if path == "/oauth/authorize":   # FP-reject SoD: OAuth self-consent, not two-party approval
+            return self._send(200, "<html><body>authorize this app</body></html>")
+        if path == "/changelog":         # FP-reject append-only: a public read-only changelog page
+            return self._send(200, "<html><body>what changed this release</body></html>")
 
         if path.startswith("/orders-secure/"):   # ownership ENFORCED -> no IDOR
             oid = path.rsplit("/", 1)[-1]

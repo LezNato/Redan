@@ -51,6 +51,37 @@ def main():
         rec("flow_map FP-reject: benign 'remember' is not classified as an invariant",
             "remember" not in inv_params, str(inv_params))
 
+        # --- endpoint-level invariants: SoD on an approval step, append-only on an audit record ---
+        sod_locs = {i.get("location") for i in res.get("candidate_invariants", [])
+                    if i.get("type") == "separation-of-duties"}
+        audit_locs = {i.get("location") for i in res.get("candidate_invariants", [])
+                      if i.get("type") == "append-only"}
+        rec("flow_map: /order/9/approve -> separation-of-duties candidate (approval step)",
+            "separation-of-duties" in inv and any("/order/9/approve" == l for l in sod_locs), str(sod_locs))
+        rec("flow_map: /approve/9 -> separation-of-duties candidate (verb-first RPC on a resource)",
+            any("/approve/9" == l for l in sod_locs), str(sod_locs))
+        rec("flow_map: /admin/auditlog -> append-only candidate (audit record)",
+            "append-only" in inv and any("auditlog" in (l or "") for l in audit_locs), str(audit_locs))
+        # FP-reject: an email-verification step is NOT two-party approval (verify not an approval token)
+        rec("flow_map FP-reject: /verify is not classified separation-of-duties",
+            not any("/verify" in (l or "") for l in sod_locs), str(sod_locs))
+        # FP-reject: self-publish (CMS) is single-actor, not two-party SoD ('publish' dropped)
+        rec("flow_map FP-reject: /blog/9/publish is not classified separation-of-duties",
+            not any("publish" in (l or "") for l in sod_locs), str(sod_locs))
+        # FP-reject: OAuth self-consent is not two-party approval ('authorize' dropped)
+        rec("flow_map FP-reject: /oauth/authorize is not classified separation-of-duties",
+            not any("authorize" in (l or "") for l in sod_locs), str(sod_locs))
+        # FP-reject: 'login' must not trip the audit 'log' token (token-boundary matching)
+        rec("flow_map FP-reject: /login is not classified append-only (login != log)",
+            not any("/login" in (l or "") for l in audit_locs), str(audit_locs))
+        # FP-reject: a public read-only /changelog page is not an audit record ('changelog' dropped)
+        rec("flow_map FP-reject: /changelog is not classified append-only",
+            not any("changelog" in (l or "") for l in audit_locs), str(audit_locs))
+        # each candidate invariant is tagged by basis (param-name vs endpoint-derived)
+        bases = {i.get("basis") for i in res.get("candidate_invariants", [])}
+        rec("flow_map: candidate invariants tagged by basis (param + endpoint)",
+            "param" in bases and "endpoint" in bases, str(bases))
+
         am = {m.get("path"): m for m in res.get("access_matrix", [])}
         ao = am.get("/admin-orders", {})
         rec("flow_map: /admin-orders classified gated + sensitive",

@@ -10,6 +10,10 @@ the recon/mapper agent then TRANSFORMS into `engagements/<name>/business_process
 `logic` / `access-control` lenses test against and the `verifier` judges "is this diff a REAL
 violation?" against.
 
+Candidate invariants come at two levels: PARAM-level (a param name -> its rule: price/qty/status/
+coupon/ownership) and ENDPOINT-level (an approval step -> separation-of-duties; an audit/immutable
+record -> append-only) — the latter reach the SoD/immutability rules no param name encodes.
+
 Discipline it inherits from the kit:
   * NOISE-LOW: params/paths are matched at TOKEN boundaries (snake_case/camelCase split), never as
     substrings — so `discount`/`account_id`/`remember`/`feedback`/`summary` are not misclassified.
@@ -59,6 +63,25 @@ SENSITIVE_TOKENS = {"admin", "account", "accounts", "user", "users", "order", "o
                     "settings", "setting", "dashboard", "internal", "manage", "management", "billing",
                     "invoice", "invoices", "payment", "payments", "report", "reports", "export", "config",
                     "me", "owner", "tenant", "private"}
+
+# ENDPOINT-level invariant heuristics (the param classifier can't reach these).
+# Matched at TOKEN boundaries (see _toks) so login != log, blog != log, feedback != fee.
+# APPROVAL_TOKENS is deliberately TIGHT — only verbs that unambiguously mean "a second party
+# formally approves an object someone else created". Broad / self-actor verbs are left OUT on
+# purpose because they FP on high-volume routes the path guard can't split: publish/release
+# (CMS content), authorize/grant (OAuth self-consent, single-admin grants), endorse/verdict
+# (social / media content). verify/confirm/activate are account-lifecycle (you act on your OWN
+# resource), never two-party approval — so they simply aren't approval tokens.
+APPROVAL_TOKENS = {"approve", "approval", "signoff", "countersign", "ratify"}
+# tight audit set; 'trail'/'journal'/'changelog'/'log'/'history' left out (blog/diary/docs-page
+# FPs) — a real audit trail is spelled audit-trail / audit_log, already caught by the 'audit' token.
+AUDIT_TOKENS = {"audit", "auditlog"}
+SOD_TEST = ("two-party control (separation of duties): the approving principal must differ from the "
+            "object's creator — create as principal A, then attempt this step as A (self-approval) AND "
+            "as a non-approver role; both must be rejected. Drive with auth_request --funclevel (two accounts).")
+APPENDONLY_TEST = ("records must be immutable — probe DELETE/PUT/PATCH (+ X-HTTP-Method-Override) via "
+                   "forbidden_bypass; every role incl. admin must be denied; re-read to confirm the record "
+                   "is unchanged. A successful edit/delete = critical integrity failure (covering tracks).")
 
 FLOW_HINTS = {
     "registration": r"regist|signup|sign-?up|create-?account|join|enrol",
@@ -173,7 +196,7 @@ def _invariants(base, cr):
         if key in seen:
             return
         seen.add(key)
-        out.append({"param": param, "location": path, "type": typ, "test": test})
+        out.append({"param": param, "location": path, "type": typ, "test": test, "basis": "param"})
     for f in cr.get("forms", []):
         path = urlparse(urljoin(base, f.get("action") or base)).path or "/"
         for name in f.get("inputs", []):
@@ -181,6 +204,37 @@ def _invariants(base, cr):
     for pp in cr.get("params", []):
         consider(pp.get("path") or "/", pp.get("param") or "")
     return sorted(out, key=lambda x: (x["type"], x["param"].lower()))
+
+
+def _endpoint_invariants(base, paths, cr, flows):
+    """Endpoint/method-level candidate invariants the param classifier can't reach:
+    separation-of-duties (an approval step) and append-only (an audit/immutable record).
+    Scans the full discovered path set (audit/approval routes are often plain links, not forms).
+    Pure classification over already-crawled data — no new requests."""
+    meth = {}
+    for f in cr.get("forms", []):
+        pp = urlparse(urljoin(base, f.get("action") or base)).path or "/"
+        meth.setdefault(pp, f.get("method", "?"))
+    flow_eps = {s.get("endpoint") for fl in flows for s in fl.get("steps", [])}
+    out, seen = [], set()
+    for path in sorted(paths):
+        toks = _toks(path)
+        segs = [s for s in path.split("/") if s]
+        m = meth.get(path, "?")
+        # A) separation-of-duties on an approval step. Precision guard: the approval verb must ACT
+        # ON A RESOURCE — a multi-segment path (/po/{id}/approve, /approve/{id}, /approveOrder/{id})
+        # — or be a step in a discovered flow. A bare single-segment /approve landing page is skipped.
+        if (APPROVAL_TOKENS & toks) and (len(segs) > 1 or path in flow_eps) and ("sod", path) not in seen:
+            seen.add(("sod", path))
+            out.append({"param": None, "location": path, "method": m,
+                        "type": "separation-of-duties", "test": SOD_TEST, "basis": "endpoint"})
+        # B) append-only on an audit/immutable record (crawls rarely reveal DELETE/PUT, so this flags
+        # the endpoint as immutability-critical and hands the mutating-verb probe to forbidden_bypass)
+        if (AUDIT_TOKENS & toks) and ("audit", path) not in seen:
+            seen.add(("audit", path))
+            out.append({"param": None, "location": path, "method": m,
+                        "type": "append-only", "test": APPENDONLY_TEST, "basis": "endpoint"})
+    return out
 
 
 def _probe(url, cookie=None):
@@ -218,7 +272,8 @@ def run(base, depth, max_pages, cookie, max_probe, conc):
         matrix.append(row)
 
     flows = _flows(base, cr)
-    invs = _invariants(base, cr)
+    invs = _invariants(base, cr) + _endpoint_invariants(base, paths, cr, flows)
+    invs = sorted(invs, key=lambda x: (x["type"], (x.get("param") or x.get("location") or "").lower()))
 
     # a pre-seeded expected_authz SCAFFOLD (anon column from what we OBSERVED; user/admin blank for
     # the mapper to FILL) — so the producer shape matches what the consumers read (verifier /
